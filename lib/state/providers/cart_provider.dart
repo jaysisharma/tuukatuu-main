@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../data/models/product.dart';
+import 'package:tuukatuu/models/product.dart';
 
 class CartProvider extends ChangeNotifier {
   final List<Map<String, dynamic>> _items = [];

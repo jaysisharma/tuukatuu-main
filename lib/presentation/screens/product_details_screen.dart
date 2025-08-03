@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../../data/models/product.dart';
-import '../../../core/config/routes.dart';
+import '../../models/product.dart';
+import '../../core/config/routes.dart';
+import '../../widgets/cached_image.dart';
+import 'package:provider/provider.dart';
+import '../../providers/unified_cart_provider.dart';
+import '../../services/api_service.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final Product product;
@@ -14,9 +18,12 @@ class ProductDetailsScreen extends StatefulWidget {
 class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   int _currentImageIndex = 0;
   int _quantity = 1;
+  int _cartQuantity = 0;
   
   // Similar products (excluding current product)
-  late List<Product> _similarProducts;
+  List<Product> _similarProducts = [];
+  bool _loadingSimilar = false;
+  String? _errorSimilar;
   
   // Frequently bought together items
   final List<Map<String, dynamic>> _frequentlyBoughtTogether = [
@@ -33,12 +40,50 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    _similarProducts = Product.dummyProducts
-        .where((product) => 
-            product.category == widget.product.category && 
-            product.id != widget.product.id)
-        .take(4)
+    _fetchSimilarProducts();
+    _updateCartQuantity();
+  }
+
+  void _updateCartQuantity() {
+    final cartProvider = Provider.of<UnifiedCartProvider>(context, listen: false);
+    final item = cartProvider.items.firstWhere(
+      (e) => e.id == widget.product.id && e.type == CartItemType.store,
+      orElse: () => CartItem(
+        id: '',
+        name: '',
+        price: 0,
+        quantity: 0,
+        image: '',
+        type: CartItemType.store,
+      ),
+    );
+    setState(() {
+      _cartQuantity = item.quantity;
+    });
+  }
+
+  Future<void> _fetchSimilarProducts() async {
+    setState(() {
+      _loadingSimilar = true;
+      _errorSimilar = null;
+    });
+    try {
+      final data = await ApiService.get('/products?category=${Uri.encodeComponent(widget.product.category)}');
+      final products = (data['products'] as List)
+          .map((json) => Product.fromJson(json))
+          .where((p) => p.id != widget.product.id)
+          .take(8)
         .toList();
+      setState(() {
+        _similarProducts = products;
+        _loadingSimilar = false;
+      });
+    } catch (e) {
+      setState(() {
+        _loadingSimilar = false;
+        _errorSimilar = e.toString();
+      });
+    }
   }
 
   Widget _buildSectionTitle(String title) {
@@ -71,8 +116,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: Image.network(
-                    product.imageUrl,
+                  child: CachedImage(
+                    imageUrl: product.imageUrl,
                     height: 120,
                     width: double.infinity,
                     fit: BoxFit.cover,
@@ -213,8 +258,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 subtitle: Text('Rs ${product.price}'),
                 secondary: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    product.imageUrl,
+                  child: CachedImage(
+                    imageUrl: product.imageUrl,
                     width: 56,
                     height: 56,
                     fit: BoxFit.cover,
@@ -262,10 +307,50 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cartProvider = Provider.of<UnifiedCartProvider>(context);
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
+      floatingActionButton: cartProvider.items.isNotEmpty
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.pushNamed(context, AppRoutes.cart);
+              },
+              backgroundColor: Colors.orange,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.shopping_cart, color: Colors.white),
+                  if (cartProvider.items.isNotEmpty)
+                    Positioned(
+                      right: -8,
+                      top: -8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 20,
+                          minHeight: 20,
+                        ),
+                        child: Text(
+                          '${cartProvider.items.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            )
+          : null,
       body: SafeArea(
         child: Column(
           children: [
@@ -290,8 +375,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                               });
                             },
                             itemBuilder: (context, index) {
-                              return Image.network(
-                                widget.product.images[index],
+                              return CachedImage(
+                                imageUrl: widget.product.images[index],
                                 fit: BoxFit.contain,
                               );
                             },
@@ -483,6 +568,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     ),
                     _buildFrequentlyBoughtTogether(),
                     _buildSectionTitle('Similar Products'),
+                    if (_loadingSimilar)
+                      const Center(child: CircularProgressIndicator())
+                    else if (_errorSimilar != null)
+                      Center(child: Text(_errorSimilar!, style: const TextStyle(color: Colors.red)))
+                    else if (_similarProducts.isEmpty)
+                      const Center(child: Text('No similar products found'))
+                    else
                     SizedBox(
                       height: 260,
                       child: ListView.builder(
@@ -523,8 +615,23 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        // TODO: Add to cart logic here
-                        Navigator.pushNamed(context, AppRoutes.cart);
+                        cartProvider.addStoreItem(
+                          id: widget.product.id,
+                          name: widget.product.name,
+                          price: widget.product.price,
+                          quantity: _quantity,
+                          image: widget.product.imageUrl,
+                          vendorId: widget.product.vendorId,
+                        );
+                        setState(() {
+                          _cartQuantity = _quantity;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${widget.product.name} (x$_quantity) added to cart'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),

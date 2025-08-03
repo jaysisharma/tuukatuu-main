@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:provider/provider.dart';
-import '../../../state/providers/theme_provider.dart';
+import 'package:tuukatuu/presentation/screens/profile/addresses_page.dart';
+import 'package:tuukatuu/presentation/screens/profile/change_password_page.dart';
+import 'package:tuukatuu/presentation/screens/profile/edit_profile_page.dart';
+import 'package:tuukatuu/presentation/screens/profile/notification_settings_page.dart';
+import 'package:tuukatuu/presentation/screens/test_notification_screen.dart';
+import 'package:tuukatuu/providers/theme_provider.dart';
 import '../auth/login_screen.dart';
-import '../../../state/providers/auth_provider.dart';
+import 'package:tuukatuu/providers/auth_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -13,6 +18,37 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.isLoggedIn && authProvider.profile == null) {
+      _fetchProfile();
+    }
+  }
+
+  Future<void> _fetchProfile() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    try {
+      await authProvider.getProfile();
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+      });
+    } finally {
+      setState(() {
+        _loading = false;
+      });
+    }
+  }
+
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
@@ -112,7 +148,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final themeProvider = Provider.of<ThemeProvider>(context);
-    
+    final authProvider = Provider.of<AuthProvider>(context);
+    final profile = authProvider.profile;
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: CustomScrollView(
@@ -160,38 +198,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             color: isDark ? Colors.orange[300] : Colors.white,
                           ),
                         ),
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.orange[300] : Colors.orange[700],
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.edit,
-                              size: 16,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
+                     
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      'John Doe',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    if (_loading) ...[
+                      const CircularProgressIndicator(),
+                    ] else if (_error != null) ...[
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Text(_error!, style: const TextStyle(color: Colors.red)),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '+977 9876543210',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    ] else if (profile == null) ...[
+                      const Text('No profile data'),
+                    ] else ...[
+                      Text(
+                        profile['name'] ?? '',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      Text(
+                        profile['phone'] ?? '',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        profile['email'] ?? '',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -206,24 +247,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildProfileOption(
                     title: 'Edit Profile',
                     icon: Icons.person_outline,
-                    onTap: () {
-                      // TODO: Implement edit profile
+                    onTap: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EditProfilePage(
+                            name: profile?['name'] ?? '',
+                            phone: profile?['phone'] ?? '',
+                          ),
+                        ),
+                      );
+                      if (result == true) {
+                        await authProvider.getProfile();
+                        setState(() {});
+                      }
                     },
                   ),
                   const Divider(height: 1),
                   _buildProfileOption(
                     title: 'Change Password',
                     icon: Icons.lock_outline,
-                    onTap: () {
-                      // TODO: Implement change password
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ChangePasswordPage()),
+                      );
                     },
                   ),
                   const Divider(height: 1),
                   _buildProfileOption(
                     title: 'Addresses',
                     icon: Icons.location_on_outlined,
-                    onTap: () {
-                      // TODO: Implement addresses
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AddressesPage()),
+                      );
                     },
                   ),
                   const Divider(height: 1),
@@ -253,6 +312,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       activeColor: isDark ? Colors.purple[300] : Colors.purple[700],
                       inactiveThumbColor: Colors.amber[700],
                     ),
+                  ),
+                  const Divider(height: 1),
+                  _buildProfileOption(
+                    title: 'Notification Settings',
+                    icon: Icons.notifications_outlined,
+                    iconColor: Colors.blue[700],
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationSettingsPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  _buildProfileOption(
+                    title: 'Test Notifications',
+                    icon: Icons.bug_report_outlined,
+                    iconColor: Colors.red[700],
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const TestNotificationScreen(),
+                        ),
+                      );
+                    },
                   ),
                 ]),
 

@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import "tailwindcss";
+
+:root {
+  --color-primary: #2563eb; /* blue-600 */
+  --color-primary-dark: #1e40af; /* blue-800 */
+  --color-secondary: #f59e42; /* orange-400 */
+  --color-accent: #10b981; /* emerald-500 */
+  --color-danger: #ef4444; /* red-500 */
+  --color-success: #22c55e; /* green-500 */
+  --color-warning: #facc15; /* yellow-400 */
+  --color-bg: #f9fafb; /* gray-50 */
+  --color-surface: #fff; /* white */
+  --color-border: #e5e7eb; /* gray-200 */
+}
+
+.text-primary { color: var(--color-primary) !important; }
+.bg-primary { background-color: var(--color-primary) !important; }
+.bg-primary-dark { background-color: var(--color-primary-dark) !important; }
+.text-secondary { color: var(--color-secondary) !important; }
+.bg-secondary { background-color: var(--color-secondary) !important; }
+.text-accent { color: var(--color-accent) !important; }
+.bg-accent { background-color: var(--color-accent) !important; }
+.text-danger { color: var(--color-danger) !important; }
+.bg-danger { background-color: var(--color-danger) !important; }
+.text-success { color: var(--color-success) !important; }
+.bg-success { background-color: var(--color-success) !important; }
+.text-warning { color: var(--color-warning) !important; }
+.bg-warning { background-color: var(--color-warning) !important; }
+.bg-surface { background-color: var(--color-surface) !important; }
+.bg-bg { background-color: var(--color-bg) !important; }
+.border-border { border-color: var(--color-border) !important; }

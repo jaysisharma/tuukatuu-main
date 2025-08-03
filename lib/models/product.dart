@@ -12,6 +12,9 @@ class Product {
   final List<String> images;
   final String? deliveryTime;
   final String? unit;
+  final String vendorId;
+  final String? dealTag;
+  final String? dealExpiresAt;
 
   const Product({
     required this.id,
@@ -25,8 +28,11 @@ class Product {
     required this.deliveryFee,
     required this.description,
     required this.images,
+    required this.vendorId,
     this.deliveryTime = '10 mins',
     this.unit = '1 piece',
+    this.dealTag,
+    this.dealExpiresAt,
   });
 
   static List<Product> dummyProducts = [
@@ -45,6 +51,7 @@ class Product {
         'assets/images/products/coca_cola.jpg',
         'assets/images/products/coca_cola_2.jpg',
       ],
+      vendorId: 'vendor1',
     ),
     Product(
       id: '2',
@@ -61,6 +68,7 @@ class Product {
         'assets/images/products/lays.jpg',
         'assets/images/products/lays_2.jpg',
       ],
+      vendorId: 'vendor2',
     ),
     Product(
       id: '3',
@@ -77,6 +85,7 @@ class Product {
         'assets/images/products/milk.jpg',
         'assets/images/products/milk_2.jpg',
       ],
+      vendorId: 'vendor1',
     ),
     Product(
       id: '4',
@@ -93,6 +102,7 @@ class Product {
         'assets/images/products/bread.jpg',
         'assets/images/products/bread_2.jpg',
       ],
+      vendorId: 'vendor2',
     ),
     Product(
       id: '5',
@@ -109,6 +119,94 @@ class Product {
         'assets/images/products/chocolate.jpg',
         'assets/images/products/chocolate_2.jpg',
       ],
+      vendorId: 'vendor1',
     ),
   ];
+
+  factory Product.fromJson(Map<String, dynamic> json) {
+    return Product(
+      id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
+      name: json['name'] ?? '',
+      price: (json['price'] is int) ? (json['price'] as int).toDouble() : (json['price'] ?? 0.0),
+      imageUrl: json['imageUrl'] ?? json['image'] ?? '',
+      category: json['category'] ?? '',
+      rating: (json['rating'] is int) ? (json['rating'] as int).toDouble() : (json['rating'] ?? 0.0),
+      reviews: json['reviews'] ?? 0,
+      isAvailable: json['isAvailable'] ?? true,
+      deliveryFee: (json['deliveryFee'] is int) ? (json['deliveryFee'] as int).toDouble() : (json['deliveryFee'] ?? 0.0),
+      description: json['description'] ?? '',
+      images: (json['images'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      vendorId: json['vendorId']?.toString() ?? '',
+      deliveryTime: json['deliveryTime']?.toString() ?? '10 mins',
+      unit: json['unit']?.toString() ?? '1 piece',
+      dealTag: json['dealTag'],
+      dealExpiresAt: json['dealExpiresAt'],
+    );
+  }
+}
+
+class BannerModel {
+  final String id;
+  final String imageUrl;
+  final String? title;
+  final String? subtitle;
+
+  BannerModel({required this.id, required this.imageUrl, this.title, this.subtitle});
+
+  factory BannerModel.fromJson(Map<String, dynamic> json) {
+    return BannerModel(
+      id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
+      imageUrl: json['imageUrl'] ?? json['image'] ?? '',
+      title: json['title'],
+      subtitle: json['subtitle'],
+    );
+  }
+}
+
+class CategoryModel {
+  final String id;
+  final String name;
+  final String? iconUrl;
+
+  CategoryModel({required this.id, required this.name, this.iconUrl});
+
+  factory CategoryModel.fromJson(Map<String, dynamic> json) {
+    return CategoryModel(
+      id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
+      name: json['name'] ?? '',
+      iconUrl: json['iconUrl'] ?? json['icon'] ?? '',
+    );
+  }
+}
+
+class Combo {
+  final String id;
+  final String name;
+  final List<Product> products;
+  final double price;
+  final String image;
+  final List<String> tags;
+  final bool isActive;
+
+  Combo({
+    required this.id,
+    required this.name,
+    required this.products,
+    required this.price,
+    required this.image,
+    required this.tags,
+    required this.isActive,
+  });
+
+  factory Combo.fromJson(Map<String, dynamic> json) {
+    return Combo(
+      id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
+      name: json['name'] ?? '',
+      products: (json['products'] as List?)?.map((e) => Product.fromJson(e)).toList() ?? [],
+      price: (json['price'] is int) ? (json['price'] as int).toDouble() : (json['price'] ?? 0.0),
+      image: json['image'] ?? '',
+      tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      isActive: json['isActive'] ?? true,
+    );
+  }
 } 

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-// import '../main_screen.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../main.dart';
+import 'login_screen.dart';
+
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
@@ -11,18 +14,18 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _phoneController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
-  bool _isEmailSignup = false;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
-    _phoneController.dispose();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -30,13 +33,39 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
-  void _signUp() {
+  void _signUp() async {
     if (_formKey.currentState!.validate()) {
-      // TODO: Implement actual sign up logic
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MainScreen()),
-      );
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      try {
+        await authProvider.signup(
+          name: _nameController.text,
+          email: _emailController.text,
+          password: _passwordController.text,
+          phone: _phoneController.text,
+        );
+        if (authProvider.isLoggedIn) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+          );
+        } else {
+          setState(() {
+            _errorMessage = 'Signup failed. Please try again.';
+          });
+        }
+      } catch (e) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -125,126 +154,81 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 child: Form(
                   key: _formKey,
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      if (!_isEmailSignup) ...[
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
+                      if (_errorMessage != null) ...[
+                        Text(
+                          _errorMessage!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: InputDecoration(
+                          labelText: 'Name',
+                          prefixIcon: Icon(Icons.person, color: Colors.orange[700]),
+                          border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey[200]!),
                           ),
-                          child: TextFormField(
-                            controller: _phoneController,
-                            keyboardType: TextInputType.phone,
-                            style: const TextStyle(fontSize: 16),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(10),
-                            ],
-                            decoration: InputDecoration(
-                              labelText: 'Phone Number',
-                              hintText: 'Enter your phone number',
-                              prefixIcon: Icon(Icons.phone_android, color: Colors.orange[700]),
-                              prefixText: '+91 ',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                              floatingLabelStyle: TextStyle(color: Colors.orange[700]),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Please enter your phone number';
-                              }
-                              if (value.length != 10) {
-                                return 'Please enter a valid 10-digit phone number';
+                            return 'Please enter your name';
                               }
                               return null;
                             },
                           ),
-                        ),
-                      ] else ...[
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey[200]!),
-                          ),
-                          child: TextFormField(
+                      const SizedBox(height: 16),
+                      TextFormField(
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
-                            style: const TextStyle(fontSize: 16),
                             decoration: InputDecoration(
                               labelText: 'Email',
-                              hintText: 'Enter your email',
-                              prefixIcon: Icon(Icons.email_outlined, color: Colors.orange[700]),
+                          prefixIcon: Icon(Icons.email, color: Colors.orange[700]),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
                               ),
-                              floatingLabelStyle: TextStyle(color: Colors.orange[700]),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return 'Please enter your email';
                               }
-                              if (!value.contains('@')) {
+                          if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+').hasMatch(value)) {
                                 return 'Please enter a valid email';
                               }
                               return null;
                             },
                           ),
-                        ),
-                      ],
                       const SizedBox(height: 16),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey[200]!),
-                        ),
-                        child: TextFormField(
-                          controller: _nameController,
-                          textCapitalization: TextCapitalization.words,
-                          style: const TextStyle(fontSize: 16),
+                      TextFormField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
                           decoration: InputDecoration(
-                            labelText: 'Full Name',
-                            hintText: 'Enter your full name',
-                            prefixIcon: Icon(Icons.person_outline, color: Colors.orange[700]),
+                          labelText: 'Phone',
+                          prefixIcon: Icon(Icons.phone, color: Colors.orange[700]),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide.none,
-                            ),
-                            floatingLabelStyle: TextStyle(color: Colors.orange[700]),
+                          ),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please enter your name';
+                            return 'Please enter your phone number';
+                          }
+                          if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) {
+                            return 'Please enter a valid 10-digit phone number';
                             }
                             return null;
                           },
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey[200]!),
-                        ),
-                        child: TextFormField(
+                      TextFormField(
                           controller: _passwordController,
                           obscureText: !_isPasswordVisible,
-                          style: const TextStyle(fontSize: 16),
                           decoration: InputDecoration(
                             labelText: 'Password',
-                            hintText: 'Enter your password',
-                            prefixIcon: Icon(Icons.lock_outline, color: Colors.orange[700]),
+                          prefixIcon: Icon(Icons.lock, color: Colors.orange[700]),
                             suffixIcon: IconButton(
-                              icon: Icon(
-                                _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
-                                color: Colors.grey[600],
-                              ),
+                            icon: Icon(_isPasswordVisible ? Icons.visibility : Icons.visibility_off),
                               onPressed: () {
                                 setState(() {
                                   _isPasswordVisible = !_isPasswordVisible;
@@ -253,9 +237,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide.none,
-                            ),
-                            floatingLabelStyle: TextStyle(color: Colors.orange[700]),
+                          ),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -266,28 +248,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             }
                             return null;
                           },
-                        ),
                       ),
                       const SizedBox(height: 16),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey[200]!),
-                        ),
-                        child: TextFormField(
+                      TextFormField(
                           controller: _confirmPasswordController,
                           obscureText: !_isConfirmPasswordVisible,
-                          style: const TextStyle(fontSize: 16),
                           decoration: InputDecoration(
                             labelText: 'Confirm Password',
-                            hintText: 'Confirm your password',
-                            prefixIcon: Icon(Icons.lock_outline, color: Colors.orange[700]),
+                          prefixIcon: Icon(Icons.lock, color: Colors.orange[700]),
                             suffixIcon: IconButton(
-                              icon: Icon(
-                                _isConfirmPasswordVisible ? Icons.visibility_off : Icons.visibility,
-                                color: Colors.grey[600],
-                              ),
+                            icon: Icon(_isConfirmPasswordVisible ? Icons.visibility : Icons.visibility_off),
                               onPressed: () {
                                 setState(() {
                                   _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
@@ -296,9 +266,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide.none,
-                            ),
-                            floatingLabelStyle: TextStyle(color: Colors.orange[700]),
+                          ),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -309,29 +277,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             }
                             return null;
                           },
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _isEmailSignup = !_isEmailSignup;
-                          });
-                        },
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.orange[700],
-                        ),
-                        child: Text(
-                          _isEmailSignup ? 'Use phone number instead' : 'Use email instead',
-                          style: const TextStyle(fontSize: 14),
-                        ),
                       ),
                       const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: _signUp,
+                          onPressed: _isLoading ? null : _signUp,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.orange[700],
                             foregroundColor: Colors.white,
@@ -340,53 +292,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                          child: const Text(
-                            'Create Account',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          child: _isLoading
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text(
+                                  'Create Account',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                         ),
                       ),
-                      const SizedBox(height: 32),
-                      Text(
-                        'Or sign up with',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildSocialButton(
-                            'assets/images/google.png',
-                            'Google',
-                            () {
-                              // TODO: Implement Google sign up
-                            },
-                          ),
-                          const SizedBox(width: 16),
-                          _buildSocialButton(
-                            'assets/images/facebook.png',
-                            'Facebook',
-                            () {
-                              // TODO: Implement Facebook sign up
-                            },
-                          ),
-                          const SizedBox(width: 16),
-                          _buildSocialButton(
-                            'assets/images/apple.png',
-                            'Apple',
-                            () {
-                              // TODO: Implement Apple sign up
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -395,7 +312,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             style: TextStyle(color: Colors.grey[600]),
                           ),
                           TextButton(
-                            onPressed: () => Navigator.pop(context),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const LoginScreen(),
+                                ),
+                              );
+                            },
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.orange[700],
                             ),
@@ -411,30 +335,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSocialButton(String iconAsset, String label, VoidCallback onPressed) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 80,
-        height: 56,
-        decoration: BoxDecoration(
-          color: Colors.grey[50],
-          border: Border.all(color: Colors.grey[200]!),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Center(
-          child: Image.asset(
-            iconAsset,
-            height: 24,
-            width: 24,
-            fit: BoxFit.contain,
           ),
         ),
       ),

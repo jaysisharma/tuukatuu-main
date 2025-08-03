@@ -39,8 +39,10 @@ class LocationService {
 
       return await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
       );
     } catch (e) {
+      print('Error getting current location: $e');
       return null;
     }
   }
@@ -65,6 +67,62 @@ class LocationService {
       return 'Location found';
     } catch (e) {
       return 'Location found';
+    }
+  }
+
+  static String calculateDistanceText(Position? userLocation, Map<String, dynamic>? storeCoordinates) {
+    if (userLocation == null || storeCoordinates == null) {
+      return 'Distance unavailable';
+    }
+    
+    try {
+      final storeLat = storeCoordinates['latitude'];
+      final storeLng = storeCoordinates['longitude'];
+      
+      if (storeLat == null || storeLng == null) {
+        return 'Distance unavailable';
+      }
+      
+      final distance = Geolocator.distanceBetween(
+        userLocation.latitude,
+        userLocation.longitude,
+        storeLat.toDouble(),
+        storeLng.toDouble(),
+      );
+      
+      if (distance < 1000) {
+        return '${distance.round()}m away';
+      } else {
+        return '${(distance / 1000).toStringAsFixed(1)}km away';
+      }
+    } catch (e) {
+      print('Error calculating distance: $e');
+      return 'Distance unavailable';
+    }
+  }
+
+  static double? calculateDistance(Position? userLocation, Map<String, dynamic>? storeCoordinates) {
+    if (userLocation == null || storeCoordinates == null) {
+      return null;
+    }
+    
+    try {
+      final storeLat = storeCoordinates['latitude'];
+      final storeLng = storeCoordinates['longitude'];
+      
+      if (storeLat == null || storeLng == null) {
+        return null;
+      }
+      
+      return Geolocator.distanceBetween(
+        userLocation.latitude,
+        userLocation.longitude,
+        storeLat.toDouble(),
+        storeLng.toDouble(),
+      );
+    } catch (e) {
+      print('Error calculating distance: $e');
+      return null;
     }
   }
 } 

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:tuukatuu/models/product.dart';
 import '../../../state/providers/search_provider.dart';
 import '../widgets/filter_bottom_sheet.dart';
 import '../widgets/cached_image.dart';
-import '../../../data/models/product.dart';
 import 'search_results_screen.dart';
+import '../../services/api_service.dart';
+import 'dart:async';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -37,6 +39,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   List<Product> _similarItems = [];
   List<Product> _recommendations = [];
+  bool _loading = false;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -51,6 +55,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void dispose() {
     _searchController.dispose();
     _focusNode.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
@@ -69,62 +74,50 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _performSearch(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () async {
     if (query.isEmpty) {
       setState(() {
         _searchResults = [];
         _searchSuggestions = [];
         _similarItems = [];
         _recommendations = [];
+          _loading = false;
       });
       return;
     }
-
-    // Generate search suggestions
-    setState(() {
-      _searchSuggestions = _allProductNames
-          .where((name) => name.toLowerCase().contains(query.toLowerCase()))
-          .toList()
-        ..sort((a, b) {
-          final aLower = a.toLowerCase();
-          final bLower = b.toLowerCase();
-          final queryLower = query.toLowerCase();
-          
-          if (aLower == queryLower) return -1;
-          if (bLower == queryLower) return 1;
-          
-          if (aLower.startsWith(queryLower) && !bLower.startsWith(queryLower)) return -1;
-          if (bLower.startsWith(queryLower) && !aLower.startsWith(queryLower)) return 1;
-          
-          return aLower.compareTo(bLower);
+      setState(() { _loading = true; });
+      try {
+        final data = await ApiService.get('/products?search=$query');
+        final products = (data['products'] as List)
+            .map((json) => Product.fromJson(json))
+            .toList();
+        setState(() {
+          _searchResults = products;
+          _searchSuggestions = products.map((p) => p.name).toList();
+          _loading = false;
         });
-
-      // Filter exact match products based on search query
-      _searchResults = Product.dummyProducts
-          .where((product) =>
-              product.name.toLowerCase().contains(query.toLowerCase()))
-          .toList();
+      } catch (e) {
+    setState(() {
+          _searchResults = [];
+          _searchSuggestions = [];
+          _loading = false;
+        });
+      }
     });
   }
 
   void _navigateToResults(String query) {
     if (query.isEmpty) return;
-
-    final results = Product.dummyProducts
-        .where((product) =>
-            product.name.toLowerCase().contains(query.toLowerCase()))
-        .toList();
-
-    if (results.isNotEmpty) {
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => SearchResultsScreen(
             query: query,
-            initialResults: results,
+          initialResults: _searchResults,
           ),
         ),
       );
-    }
   }
 
   Widget _buildSearchBar() {
@@ -310,10 +303,18 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildSearchResults() {
-    if (_searchResults.isEmpty && _similarItems.isEmpty && _recommendations.isEmpty) {
-      return const SizedBox();
+    if (_loading) {
+      return const Center(child: Padding(
+        padding: EdgeInsets.all(32),
+        child: CircularProgressIndicator(),
+      ));
     }
-
+    if (_searchResults.isEmpty && _similarItems.isEmpty && _recommendations.isEmpty) {
+      return const Center(child: Padding(
+        padding: EdgeInsets.all(32),
+        child: Text('No results found'),
+      ));
+    }
     final theme = Theme.of(context);
     
     return Column(

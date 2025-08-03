@@ -1,0 +1,33 @@
+{
+  "name": "tuukatuu-backend",
+  "version": "1.0.0",
+  "description": "Backend for Tuukatuu app supporting admin, vendor, rider, and customer roles.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "jest",
+    "seed:riders": "node seed_riders.js",
+    "seed:vendors": "node seed_vendors.js",
+    "seed:vendors-only": "node seed_vendors_only.js",
+    "seed:all": "node seed_all.js"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "bcryptjs": "^3.0.2",
+    "cloudinary": "^2.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.0",
+    "express": "^4.18.2",
+    "joi": "^17.13.3",
+    "jsonwebtoken": "^9.0.0",
+    "mongoose": "^7.0.0",
+    "morgan": "^1.10.0",
+    "multer": "^2.0.2"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "nodemon": "^2.0.0",
+    "supertest": "^6.0.0"
+  }
+}

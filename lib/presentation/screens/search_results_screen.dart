@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../data/models/product.dart';
-import '../../../state/providers/search_provider.dart';
-import '../../../state/providers/cart_provider.dart';
+import '../../models/product.dart';
+import '../../providers/search_provider.dart';
+import '../../providers/cart_provider.dart';
 import '../widgets/cached_image.dart';
 import '../widgets/filter_bottom_sheet.dart';
+import '../../services/api_service.dart';
+import 'dart:async';
+import '../../../core/config/routes.dart';
 
 class SearchResultsScreen extends StatefulWidget {
   final String query;
@@ -28,6 +31,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
   final Map<String, int> _quantities = {}; // Track quantities for each product
   late AnimationController _cartAnimationController;
   late Animation<double> _cartAnimation;
+  bool _loading = false;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -52,6 +57,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
         curve: Curves.easeInOut,
       ),
     );
+    _searchController.addListener(_onSearchChanged);
   }
 
   void _loadSimilarAndRecommendedProducts() {
@@ -82,7 +88,38 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
   void dispose() {
     _searchController.dispose();
     _cartAnimationController.dispose();
+    _debounce?.cancel();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () async {
+      final query = _searchController.text.trim();
+      if (query.isEmpty) {
+        setState(() {
+          _filteredProducts = [];
+          _loading = false;
+        });
+        return;
+      }
+      setState(() { _loading = true; });
+      try {
+        final data = await ApiService.get('/products?search=$query');
+        final products = (data['products'] as List)
+            .map((json) => Product.fromJson(json))
+            .toList();
+        setState(() {
+          _filteredProducts = products;
+          _loading = false;
+        });
+      } catch (e) {
+        setState(() {
+          _filteredProducts = [];
+          _loading = false;
+        });
+      }
+    });
   }
 
   void _showFilterBottomSheet() {
@@ -189,12 +226,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                   child: Stack(
                     children: [
-                      Image.asset(
-                        product.imageUrl,
-                        width: double.infinity,
-                        height: 140,
-                        fit: BoxFit.cover,
-                      ),
+                      CachedImage(imageUrl: product.imageUrl, width: double.infinity, height: 140, fit: BoxFit.cover),
                       if (product.deliveryFee == 0)
                         Positioned(
                           top: 8,
@@ -373,14 +405,14 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
         scale: _cartAnimation,
         child: FloatingActionButton(
           onPressed: () {
-            // TODO: Navigate to cart screen
+            Navigator.pushNamed(context, AppRoutes.cart);
           },
           backgroundColor: theme.colorScheme.primary,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
               const Icon(Icons.shopping_cart, color: Colors.white),
-              if (cartProvider.itemCount > 0)
+              if (cartProvider.items.isNotEmpty)
                 Positioned(
                   right: -8,
                   top: -8,
@@ -396,7 +428,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
                       minHeight: 20,
                     ),
                     child: Text(
-                      '${cartProvider.itemCount}',
+                      '${cartProvider.items.length}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -448,39 +480,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
                       ),
                       child: TextField(
                         controller: _searchController,
-                        onSubmitted: (value) {
-                          searchProvider.setQuery(value);
-                          _applyFilters();
-                        },
                         decoration: InputDecoration(
                           hintText: 'Search...',
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16,
-                          ),
-                          suffixIcon: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              IconButton(
-                                onPressed: _showFilterBottomSheet,
-                                icon: const Icon(Icons.tune),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              ),
-                              if (searchProvider.hasActiveFilters)
-                                Positioned(
-                                  right: 0,
-                                  top: 0,
-                                  child: Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                ),
-                            ],
                           ),
                         ),
                       ),
@@ -490,7 +494,9 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
               ),
             ),
             Expanded(
-              child: _filteredProducts.isEmpty
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filteredProducts.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,

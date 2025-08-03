@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '../routes.dart';
+import 'package:tuukatuu/core/config/routes.dart';
+
+import '../widgets/cached_image.dart';
 
 class StoreDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> store;
@@ -78,10 +80,10 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      item['image']!,
-                      width: 60,
+                    child: CachedImage(
+                      imageUrl: item['image']!,
                       height: 60,
+                      width: 60,
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -410,15 +412,9 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
         background: Stack(
           fit: StackFit.expand,
           children: [
-            Image.network(
-              widget.store['image']!,
+            CachedImage(
+              imageUrl: widget.store['image']!,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.image_not_supported),
-                );
-              },
             ),
             Container(
               decoration: BoxDecoration(
@@ -766,21 +762,11 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(12),
                 ),
-                child: Image.network(
-                  item['image']!,
+                child: CachedImage(
+                  imageUrl: item['image']!,
                   height: 120,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      height: 120,
-                      color: Colors.grey[300],
-                      child: const Icon(
-                        Icons.image_not_supported_outlined,
-                        color: Colors.grey,
-                      ),
-                    );
-                  },
                 ),
               ),
               Positioned(

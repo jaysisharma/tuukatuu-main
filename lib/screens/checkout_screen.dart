@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
 import '../models/product.dart';
+import '../models/address.dart';
+import 'package:provider/provider.dart';
+import '../providers/address_provider.dart';
+import '../providers/auth_provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../widgets/cached_image.dart';
+import '../services/api_service.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final double totalAmount;
   final List<Map<String, dynamic>> cartItems;
+  final bool isTmartOrder;
 
   const CheckoutScreen({
     super.key,
     required this.totalAmount,
     required this.cartItems,
+    this.isTmartOrder = false,
   });
 
   @override
@@ -23,21 +32,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController _instructionsController = TextEditingController();
   final TextEditingController _customTipController = TextEditingController();
   bool _isCustomTip = false;
-
-  final List<Map<String, dynamic>> _addresses = [
-    {
-      'type': 'Home',
-      'address': '123 Main Street, Apartment 4B',
-      'details': 'New York, NY 10001',
-      'icon': Icons.home_outlined,
-    },
-    {
-      'type': 'Work',
-      'address': '456 Office Plaza, Floor 12',
-      'details': 'New York, NY 10002',
-      'icon': Icons.work_outline,
-    },
-  ];
+  bool _showAllAddresses = false;
 
   final List<Map<String, dynamic>> _paymentMethods = [
     {
@@ -116,6 +111,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final List<Product> _missedProducts = Product.dummyProducts.take(3).toList();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+      print('🔍 Checkout: Fetching addresses...');
+      // Always fetch addresses to ensure they're loaded
+      addressProvider.fetchAddresses().then((_) {
+        print('🔍 Checkout: Addresses loaded: ${addressProvider.addresses.length}');
+        if (mounted) {
+          setState(() {
+            // Reset selected address index if current selection is invalid
+            if (_selectedAddressIndex >= addressProvider.addresses.length) {
+              _selectedAddressIndex = addressProvider.addresses.isNotEmpty ? 0 : -1;
+            }
+          });
+        }
+      }).catchError((error) {
+        print('❌ Error fetching addresses: $error');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to load addresses: $error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      });
+    });
+  }
+
+  @override
   void dispose() {
     _instructionsController.dispose();
     _customTipController.dispose();
@@ -143,12 +169,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final addressProvider = Provider.of<AddressProvider>(context);
+    final addresses = addressProvider.addresses;
+    final showMoreButton = !_showAllAddresses && addresses.length > 2;
+    final visibleAddresses = showMoreButton ? addresses.take(2).toList() : addresses;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Checkout',
-          style: TextStyle(
+        title: Text(
+          widget.isTmartOrder ? 'T-Mart Checkout' : 'Checkout',
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
@@ -156,6 +186,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ),
       body: Column(
         children: [
+          // T-Mart Order Indicator
+          if (widget.isTmartOrder)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: const Color(0xFFFC8019).withOpacity(0.1),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.local_grocery_store,
+                    color: const Color(0xFFFC8019),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'T-Mart Order - High Priority',
+                    style: TextStyle(
+                      color: const Color(0xFFFC8019),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFC8019),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      '20 min',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
           Expanded(
             child: SingleChildScrollView(
               child: Column(
@@ -186,7 +257,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         _buildSectionWithHeader(
                           'Delivery Address',
                           Icons.location_on_outlined,
-                          _buildAddressSection(),
+                          _buildAddressSection(addressProvider, visibleAddresses, showMoreButton),
                         ),
                         const SizedBox(height: 24),
                         _buildSectionWithHeader(
@@ -293,15 +364,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       SizedBox(
                         height: 54,
                         child: ElevatedButton(
-                          onPressed: () {
-                            // TODO: Implement order placement
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Order placed successfully!'),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                            Navigator.of(context).popUntil((route) => route.isFirst);
+                          onPressed: addresses.isEmpty ? null : () {
+                            _placeOrder();
                           },
                           style: ElevatedButton.styleFrom(
                             shape: RoundedRectangleBorder(
@@ -327,6 +391,109 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ],
       ),
     );
+  }
+
+  void _placeOrder() async {
+    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    if (addressProvider.addresses.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please add a delivery address first'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_selectedAddressIndex < 0 || _selectedAddressIndex >= addressProvider.addresses.length) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a delivery address'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final selectedAddress = addressProvider.addresses[_selectedAddressIndex];
+    
+    // Validate address coordinates
+    if (selectedAddress.latitude == 0 && selectedAddress.longitude == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selected address is missing coordinates. Please select a valid address.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Determine if this is a T-Mart order
+    final isTmartOrder = widget.isTmartOrder || 
+        (widget.cartItems.isNotEmpty && widget.cartItems.first['orderType'] == 'tmart');
+    
+    // Calculate totals
+    final itemTotal = widget.cartItems.fold<double>(0, (sum, item) => sum + (item['price'] * item['quantity']));
+    final deliveryFee = isTmartOrder ? (itemTotal >= 500 ? 0.0 : 40.0) : 40.0;
+    final tax = itemTotal * 0.05;
+    final tip = _getSelectedTip();
+    final total = itemTotal + tax + deliveryFee + tip;
+
+    final orderPayload = {
+      'vendorId': isTmartOrder ? 'tmart' : 'vendor_id', // Replace with actual vendor ID
+      'items': widget.cartItems.map((item) => ({
+        'productId': item['id'],
+        'name': item['name'],
+        'price': item['price'],
+        'quantity': item['quantity'],
+        'image': item['image'] ?? item['imageUrl'],
+        'unit': item['unit'],
+      })),
+      'itemTotal': itemTotal,
+      'tax': tax,
+      'deliveryFee': deliveryFee,
+      'tip': tip,
+      'total': total,
+      'deliveryAddress': selectedAddress.address,
+      'instructions': _instructionsController.text,
+      'paymentMethod': _selectedPaymentMethodIndex == 0 ? 'cash' : 'card',
+      'orderType': isTmartOrder ? 'tmart' : 'regular',
+      'priority': isTmartOrder ? 'high' : 'low',
+      'customerLocation': {
+        'latitude': selectedAddress.latitude,
+        'longitude': selectedAddress.longitude,
+        'address': selectedAddress.address,
+        'label': selectedAddress.label,
+      },
+    };
+
+    try {
+      final endpoint = isTmartOrder ? '/orders/tmart' : '/orders';
+      final order = await ApiService.post(
+        endpoint,
+        token: authProvider.jwtToken,
+        body: orderPayload,
+      );
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Order placed successfully!'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to place order: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Widget _buildProgressStep(int step, String label, bool isActive) {
@@ -406,34 +573,139 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildAddressSection() {
-    return Column(
-      children: _addresses.asMap().entries.map((entry) {
-        final index = entry.key;
-        final address = entry.value;
-        final isSelected = index == _selectedAddressIndex;
+  Widget _buildAddressSection(AddressProvider addressProvider, List<Address> visibleAddresses, bool showMoreButton) {
+    if (addressProvider.isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
-        return _buildSelectionTile(
-          isSelected: isSelected,
-          onTap: () => setState(() => _selectedAddressIndex = index),
-          leading: Icon(
-            address['icon'] as IconData,
-            color: isSelected ? Colors.white : null,
+    if (visibleAddresses.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey[800]!
+                : Colors.grey[200]!,
           ),
-          title: address['type'] as String,
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(address['address'] as String),
-              Text(
-                address['details'] as String,
-                style: const TextStyle(fontSize: 12),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.location_off_outlined,
+              size: 48,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No addresses found',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[600],
               ),
-            ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Please add a delivery address to continue',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                // Navigate to add address screen
+                Navigator.pushNamed(context, '/add-address');
+              },
+              icon: const Icon(Icons.add_location),
+              label: const Text('Add Address'),
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        ...visibleAddresses.asMap().entries.map((entry) {
+          final index = entry.key;
+          final address = entry.value;
+          final isSelected = index == _selectedAddressIndex;
+
+          return _buildSelectionTile(
+            isSelected: isSelected,
+            onTap: () => setState(() => _selectedAddressIndex = index),
+            leading: Icon(
+              _getAddressIcon(address.label),
+              color: isSelected ? Colors.white : null,
+            ),
+            title: address.label,
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(address.address),
+                if (address.latitude != 0 && address.longitude != 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      '${address.latitude.toStringAsFixed(4)}, ${address.longitude.toStringAsFixed(4)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+              ],
+            ),
+          );
+        }).toList(),
+        if (showMoreButton)
+          TextButton(
+            onPressed: () => setState(() => _showAllAddresses = true),
+            child: const Text('Show More Addresses'),
           ),
-        );
-      }).toList(),
+        const SizedBox(height: 16),
+        // Add New Address Button
+        Container(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              // Navigate to add address screen
+              Navigator.pushNamed(context, '/add-address');
+            },
+            icon: const Icon(Icons.add_location),
+            label: const Text('Add New Address'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
+  }
+
+  IconData _getAddressIcon(String label) {
+    switch (label.toLowerCase()) {
+      case 'home':
+        return Icons.home_rounded;
+      case 'work':
+        return Icons.work_rounded;
+      default:
+        return Icons.place_rounded;
+    }
   }
 
   Widget _buildPaymentMethodSection() {
@@ -490,13 +762,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 ),
                               ],
                             ),
-                            child: Image.network(
-                              method['logo'] as String,
+                            child: CachedImage(
+                              imageUrl: method['logo'] as String,
+                              height: 40,
+                              width: 40,
                               fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) => Icon(
-                                Icons.payment,
-                                color: method['color'] as Color? ?? theme.colorScheme.primary,
-                              ),
                             ),
                           )
                         else
