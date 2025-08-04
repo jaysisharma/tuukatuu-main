@@ -8,6 +8,7 @@ import 'package:tuukatuu/presentation/screens/location/Map_Page.dart';
 import 'package:tuukatuu/models/address.dart';
 import 'package:tuukatuu/providers/address_provider.dart';
 import 'package:tuukatuu/providers/auth_provider.dart';
+import 'package:tuukatuu/providers/location_provider.dart';
 
 class LocationScreen extends StatefulWidget {
   const LocationScreen({super.key});
@@ -134,7 +135,24 @@ class _LocationScreenState extends State<LocationScreen> {
     }
 
     final fullAddress = _buildFullAddress();
-    if (mounted) Navigator.pop(context, fullAddress);
+    
+    // Set as delivery location
+    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+    await locationProvider.setDeliveryLocation(
+      address: fullAddress,
+      latitude: 27.7172, // Default coordinates for current location
+      longitude: 85.3240,
+      label: 'Current Location',
+    );
+    
+    if (mounted) {
+      _showSnackBar("✅ Delivery location set to current location");
+      Navigator.pop(context, {
+        'label': 'Current Location',
+        'address': fullAddress,
+        'deliveryLocation': true,
+      });
+    }
   }
 
   String _buildFullAddress() {
@@ -358,6 +376,7 @@ class _LocationScreenState extends State<LocationScreen> {
   Widget _buildSavedLocationsList() {
     return Consumer<AddressProvider>(
       builder: (context, addressProvider, child) {
+        // Handle loading state
         if (addressProvider.isLoading) {
           return const Center(
             child: Padding(
@@ -367,67 +386,107 @@ class _LocationScreenState extends State<LocationScreen> {
           );
         }
 
+        // Handle error state
         if (addressProvider.error != null) {
           return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 48, color: Colors.red[400]),
-                const SizedBox(height: 16),
-                Text(
-                  "Error loading addresses",
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 48, color: Colors.red[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Error loading addresses",
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  addressProvider.error!,
-                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => addressProvider.fetchAddresses(),
-                  child: const Text("Retry"),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  Text(
+                    addressProvider.error!,
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () => addressProvider.retryFetchAddresses(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF6B35),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text("Retry"),
+                      ),
+                      if (!addressProvider.isAuthenticated) ...[
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () {
+                            // Navigate to login screen or refresh auth
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text("Login"),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           );
         }
 
-        if (!addressProvider.hasAddresses) {
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.location_off, size: 48, color: Colors.grey[400]),
-              const SizedBox(height: 16),
-              Text(
-                "No saved locations yet",
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
+        // Handle empty state (no addresses)
+        if (addressProvider.addresses.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.location_off, size: 48, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    "No saved locations yet",
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Search for a place or use current location to save your first address",
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                "Search for a place to save a location",
-                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-              ),
-            ],
+            ),
           );
         }
 
+        // Show addresses list
         return ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: addressProvider.addresses.length,
           itemBuilder: (context, index) {
             final address = addressProvider.addresses[index];
-            print(address);
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
@@ -483,14 +542,32 @@ class _LocationScreenState extends State<LocationScreen> {
                 ),
                 subtitle: Padding(
                   padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    address.address,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        address.address,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      if (address.instructions.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          "📝 ${address.instructions}",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 trailing: Row(
@@ -520,7 +597,25 @@ class _LocationScreenState extends State<LocationScreen> {
                     ),
                   ],
                 ),
-                onTap: () => Navigator.pop(context, address.address),
+                onTap: () async {
+                  // Set as delivery location
+                  final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+                  await locationProvider.setDeliveryLocation(
+                    address: address.address,
+                    latitude: address.latitude,
+                    longitude: address.longitude,
+                    label: address.label,
+                  );
+                  
+                  if (mounted) {
+                    _showSnackBar("✅ Delivery location set to '${address.label}'");
+                    Navigator.pop(context, {
+                      'label': address.label,
+                      'address': address.address,
+                      'deliveryLocation': true,
+                    });
+                  }
+                },
               ),
             );
           },
@@ -585,7 +680,10 @@ class _LocationScreenState extends State<LocationScreen> {
                       final address = result['address']!;
                       final label = result['label']!;
                       _showSnackBar("Location selected: $label");
-                      Navigator.pop(context, address);
+                      Navigator.pop(context, {
+                        'label': label,
+                        'address': address,
+                      });
                     }
                   },
                   inputDecoration: InputDecoration(

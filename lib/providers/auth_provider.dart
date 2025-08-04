@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
-import 'dart:convert';
+import '../services/error_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   static const String _isLoggedInKey = 'is_logged_in';
@@ -32,44 +32,92 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> getProfile() async {
     if (_jwtToken == null) return;
-    final data = await ApiService.get('/auth/me', token: _jwtToken);
-    _profile = data;
-    notifyListeners();
+    
+    try {
+      final data = await ApiService.get('/auth/me', token: _jwtToken);
+      _profile = data;
+      notifyListeners();
+    } catch (e) {
+      if (e is ApiException && e.errorType == ErrorService.authenticationError) {
+        // Token is invalid, log out the user
+        await logout();
+      }
+      rethrow;
+    }
+  }
+
+  /// Validates the current JWT token by attempting to get user profile
+  Future<bool> validateToken() async {
+    if (_jwtToken == null) return false;
+    
+    try {
+      await ApiService.get('/auth/me', token: _jwtToken);
+      return true;
+    } catch (e) {
+      // Token is invalid or expired
+      if (e is ApiException && e.errorType == ErrorService.authenticationError) {
+        await logout();
+      }
+      return false;
+    }
   }
 
   Future<void> updateProfile({required String name, required String phone}) async {
     if (_jwtToken == null) return;
-    final data = await ApiService.put('/auth/me', {}, token: _jwtToken, body: {
-      'name': name,
-      'phone': phone,
-    });
-    _profile = data;
-    notifyListeners();
+    
+    try {
+      final data = await ApiService.put('/auth/me', {}, token: _jwtToken, body: {
+        'name': name,
+        'phone': phone,
+      });
+      _profile = data;
+      notifyListeners();
+    } catch (e) {
+      if (e is ApiException) {
+        throw ApiException(e.errorType, e.message);
+      }
+      throw ApiException(ErrorService.unknownError, 'Failed to update profile');
+    }
   }
 
   Future<void> login({required String email, required String password}) async {
-    final data = await ApiService.post('/auth/login', body: {
-      'email': email,
-      'password': password,
-    });
-    _isLoggedIn = true;
-    _userEmail = data['user']['email'];
-    _jwtToken = data['token'];
-    await _prefs.setBool(_isLoggedInKey, true);
-    await _prefs.setString(_userEmailKey, _userEmail!);
-    await _prefs.setString(_jwtTokenKey, _jwtToken!);
-    await getProfile();
-    notifyListeners();
+    try {
+      final data = await ApiService.post('/auth/login', body: {
+        'email': email,
+        'password': password,
+      });
+      
+      _isLoggedIn = true;
+      _userEmail = data['user']['email'];
+      _jwtToken = data['token'];
+      await _prefs.setBool(_isLoggedInKey, true);
+      await _prefs.setString(_userEmailKey, _userEmail!);
+      await _prefs.setString(_jwtTokenKey, _jwtToken!);
+      await getProfile();
+      notifyListeners();
+    } catch (e) {
+      if (e is ApiException) {
+        throw ApiException(e.errorType, e.message);
+      }
+      throw ApiException(ErrorService.authenticationError, 'Login failed. Please check your credentials.');
+    }
   }
 
   Future<void> signup({required String name, required String email, required String password, required String phone}) async {
-    await ApiService.post('/auth/register', body: {
-      'name': name,
-      'email': email,
-      'password': password,
-      'phone': phone,
-    });
-    await login(email: email, password: password);
+    try {
+      await ApiService.post('/auth/register', body: {
+        'name': name,
+        'email': email,
+        'password': password,
+        'phone': phone,
+      });
+      await login(email: email, password: password);
+    } catch (e) {
+      if (e is ApiException) {
+        throw ApiException(e.errorType, e.message);
+      }
+      throw ApiException(ErrorService.validationError, 'Signup failed. Please check your information.');
+    }
   }
 
   Future<void> logout() async {
@@ -85,9 +133,17 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> changePassword({required String oldPassword, required String newPassword}) async {
     if (_jwtToken == null) return;
-    await ApiService.put('/auth/change-password', {}, token: _jwtToken, body: {
-      'oldPassword': oldPassword,
-      'newPassword': newPassword,
-    });
+    
+    try {
+      await ApiService.put('/auth/change-password', {}, token: _jwtToken, body: {
+        'oldPassword': oldPassword,
+        'newPassword': newPassword,
+      });
+    } catch (e) {
+      if (e is ApiException) {
+        throw ApiException(e.errorType, e.message);
+      }
+      throw ApiException(ErrorService.validationError, 'Failed to change password. Please check your current password.');
+    }
   }
 } 

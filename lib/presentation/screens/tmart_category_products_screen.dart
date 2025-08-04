@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:tuukatuu/providers/mart_cart_provider.dart';
-import 'package:tuukatuu/presentation/widgets/tmart_product_card.dart';
+import 'package:tuukatuu/providers/recently_viewed_provider.dart';
 import 'package:tuukatuu/services/api_service.dart';
-
-// Swiggy color scheme
-const Color swiggyOrange = Color(0xFFFC8019);
-const Color swiggyRed = Color(0xFFE23744);
-const Color swiggyDark = Color(0xFF1C1C1C);
-const Color swiggyLight = Color(0xFFF8F9FA);
+import 'package:tuukatuu/presentation/widgets/tmart_product_card.dart';
+import 'package:tuukatuu/presentation/widgets/cached_image.dart';
+import 'package:tuukatuu/routes.dart';
 
 class TMartCategoryProductsScreen extends StatefulWidget {
   final String categoryName;
@@ -30,20 +27,29 @@ class _TMartCategoryProductsScreenState extends State<TMartCategoryProductsScree
   bool _isLoading = true;
   bool _hasError = false;
   String _errorMessage = '';
-  String _sortBy = 'relevance';
-  String _filterBy = 'all';
-  final TextEditingController _searchController = TextEditingController();
+  int _currentPage = 1;
+  bool _hasMore = true;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadProducts();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (!_isLoading && _hasMore) {
+        _loadMoreProducts();
+      }
+    }
   }
 
   Future<void> _loadProducts() async {
@@ -53,335 +59,278 @@ class _TMartCategoryProductsScreenState extends State<TMartCategoryProductsScree
     });
 
     try {
-  
-      // Build query parameters
-      final params = <String, String>{
-        'category': widget.categoryDisplayName,
-        'sort': _sortBy,
-        'limit': '50',
-      };
-      
-      // Add filter parameters
-      if (_filterBy != 'all') {
-        switch (_filterBy) {
-          case 'best_seller':
-            params['isBestSeller'] = 'true';
-            break;
-          case 'featured':
-            params['isFeatured'] = 'true';
-            break;
-          case 'daily_essential':
-            params['dailyEssential'] = 'true';
-            break;
-        }
-      }
-      
-      // Use the correct T-Mart API endpoint
-      final response = await ApiService.get('/tmart/products', params: params);
+      final response = await ApiService.get(
+        '/tmart/category/query?category=${widget.categoryName}&page=1&limit=20',
+      );
 
-      print('🔍 API Response: $response');
-
-      if (response != null && response['success'] == true) {
-        final products = List<Map<String, dynamic>>.from(response['data'] ?? []);
-      
+      if (response['success']) {
         setState(() {
-          _products = products;
+          _products = List<Map<String, dynamic>>.from(response['data']);
+          _hasMore = response['hasMore'] ?? false;
           _isLoading = false;
         });
       } else {
-        print('❌ API returned error: ${response?['message']}');
         setState(() {
           _hasError = true;
-          _errorMessage = response?['message'] ?? 'Failed to load products';
+          _errorMessage = response['message'] ?? 'Failed to load products';
           _isLoading = false;
         });
       }
     } catch (e) {
-      print('❌ Error loading products for category ${widget.categoryDisplayName}: $e');
       setState(() {
         _hasError = true;
-        _errorMessage = 'Network error: ${e.toString()}';
+        _errorMessage = 'Network error: $e';
         _isLoading = false;
       });
     }
   }
 
-  Future<void> _searchProducts() async {
-    if (_searchController.text.trim().isEmpty) {
-      _loadProducts();
-      return;
-    }
+  Future<void> _loadMoreProducts() async {
+    if (_isLoading || !_hasMore) return;
 
     setState(() {
       _isLoading = true;
-      _hasError = false;
     });
 
     try {
-      print('🔍 Searching products: ${_searchController.text.trim()}');
-      
-      // Build query parameters for search
-      final params = <String, String>{
-        'search': _searchController.text.trim(),
-        'category': widget.categoryDisplayName,
-        'sort': _sortBy,
-        'limit': '50',
-      };
-      
-      // Add filter parameters if not showing all
-      if (_filterBy != 'all') {
-        switch (_filterBy) {
-          case 'best_seller':
-            params['isBestSeller'] = 'true';
-            break;
-          case 'featured':
-            params['isFeatured'] = 'true';
-            break;
-          case 'daily_essential':
-            params['dailyEssential'] = 'true';
-            break;
-        }
-      }
-      
-      final response = await ApiService.get('/tmart/products', params: params);
+      final nextPage = _currentPage + 1;
+      final response = await ApiService.get(
+        '/tmart/category/query?category=${widget.categoryName}&page=$nextPage&limit=20',
+      );
 
-      print('🔍 Search Response: $response');
-
-      if (response != null && response['success'] == true) {
-        final products = List<Map<String, dynamic>>.from(response['data'] ?? []);
-        print('🔍 Found ${products.length} products in search');
-        
+      if (response['success']) {
+        final newProducts = List<Map<String, dynamic>>.from(response['data']);
         setState(() {
-          _products = products;
+          _products.addAll(newProducts);
+          _currentPage = nextPage;
+          _hasMore = response['hasMore'] ?? false;
           _isLoading = false;
         });
       } else {
-        print('❌ Search API returned error: ${response?['message']}');
         setState(() {
-          _hasError = true;
-          _errorMessage = response?['message'] ?? 'Failed to search products';
+          _hasMore = false;
           _isLoading = false;
         });
       }
     } catch (e) {
-      print('❌ Error searching products: $e');
       setState(() {
-        _hasError = true;
-        _errorMessage = 'Network error: ${e.toString()}';
+        _hasMore = false;
         _isLoading = false;
       });
     }
   }
 
-  void _showSortDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Sort By', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildSortOption('createdAt', 'Newest First'),
-            _buildSortOption('rating', 'Rating'),
-            _buildSortOption('price', 'Price: Low to High'),
-            _buildSortOption('name', 'Name A-Z'),
-            _buildSortOption('reviews', 'Most Reviewed'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSortOption(String value, String label) {
-    return RadioListTile<String>(
-      title: Text(label, style: GoogleFonts.poppins()),
-      value: value,
-      groupValue: _sortBy,
-      onChanged: (newValue) {
-        setState(() {
-          _sortBy = newValue!;
-        });
-        Navigator.pop(context);
-        _loadProducts();
-      },
-    );
-  }
-
-  void _showFilterDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Filter By', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildFilterOption('all', 'All Products'),
-            _buildFilterOption('best_seller', 'Best Sellers'),
-            _buildFilterOption('featured', 'Featured'),
-            _buildFilterOption('daily_essential', 'Daily Essentials'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterOption(String value, String label) {
-    return RadioListTile<String>(
-      title: Text(label, style: GoogleFonts.poppins()),
-      value: value,
-      groupValue: _filterBy,
-      onChanged: (newValue) {
-        setState(() {
-          _filterBy = newValue!;
-        });
-        Navigator.pop(context);
-        _loadProducts();
-      },
-    );
+  Future<void> _refreshProducts() async {
+    setState(() {
+      _currentPage = 1;
+      _hasMore = true;
+    });
+    await _loadProducts();
   }
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<MartCartProvider>(
-      create: (_) => MartCartProvider(),
-      child: Builder(
-        builder: (context) {
-          final martCartProvider = Provider.of<MartCartProvider>(context);
-          
-          return Scaffold(
-            backgroundColor: swiggyLight,
-            floatingActionButton: martCartProvider.items.isNotEmpty
-                ? FloatingActionButton(
-                    onPressed: () {
-                      try {
-                        Navigator.pushNamed(context, '/tmart-cart');
-                      } catch (e) {
-                        // Fallback if route doesn't exist
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Cart: ${martCartProvider.items.length} items'),
-                            backgroundColor: swiggyOrange,
-                          ),
-                        );
-                      }
-                    },
-                    backgroundColor: swiggyOrange,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        const Icon(Icons.shopping_cart, color: Colors.white),
-                        if (martCartProvider.items.isNotEmpty)
-                          Positioned(
-                            right: -8,
-                            top: -8,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: swiggyRed,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 1.5),
-                              ),
-                              constraints: const BoxConstraints(
-                                minWidth: 20,
-                                minHeight: 20,
-                              ),
-                              child: Text(
-                                '${martCartProvider.items.length}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  )
-                : null,
-            appBar: AppBar(
-              backgroundColor: swiggyOrange,
-              elevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
-              ),
-              title: Text(
-                widget.categoryDisplayName,
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.sort, color: Colors.white),
-                  onPressed: _showSortDialog,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.filter_list, color: Colors.white),
-                  onPressed: _showFilterDialog,
-                ),
-              ],
-            ),
-            body: Column(
-              children: [
-                // Search bar
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: swiggyOrange,
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(20),
-                      bottomRight: Radius.circular(20),
-                    ),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: "Search in ${widget.categoryDisplayName}...",
-                      hintStyle: TextStyle(color: Colors.grey[400]),
-                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.clear, color: Colors.grey),
-                        onPressed: () {
-                          _searchController.clear();
-                          _loadProducts();
-                        },
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    ),
-                    onSubmitted: (_) => _searchProducts(),
-                  ),
-                ),
-                
-                // Products grid
-                Expanded(
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _hasError
-                          ? _buildErrorWidget()
-                          : _products.isEmpty
-                              ? _buildEmptyWidget()
-                              : _buildProductsGrid(martCartProvider),
-                ),
-              ],
-            ),
-          );
-        },
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          widget.categoryDisplayName,
+          style: GoogleFonts.poppins(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search, color: Colors.black87),
+            onPressed: () {
+              // TODO: Implement search functionality
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.filter_list, color: Colors.black87),
+            onPressed: () {
+              // TODO: Implement filter functionality
+            },
+          ),
+        ],
+      ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_hasError) {
+      return _buildErrorState();
+    }
+
+    if (_products.isEmpty && !_isLoading) {
+      return _buildEmptyState();
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refreshProducts,
+      child: Column(
+        children: [
+          _buildCategoryHeader(),
+          Expanded(
+            child: _buildProductsGrid(),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildErrorWidget() {
+  Widget _buildCategoryHeader() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFC8019).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.category,
+              color: Color(0xFFFC8019),
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.categoryDisplayName,
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${_products.length} products available',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductsGrid() {
+    return Consumer2<MartCartProvider, RecentlyViewedProvider>(
+      builder: (context, martCartProvider, recentlyViewedProvider, child) {
+        return GridView.builder(
+          controller: _scrollController,
+          padding: const EdgeInsets.all(16),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 0.75,
+          ),
+          itemCount: _products.length + (_hasMore ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == _products.length) {
+              return _buildLoadingIndicator();
+            }
+
+            final product = _products[index];
+            final String productId = product['_id'] ?? product['id'] ?? '';
+            final int quantity = martCartProvider.getItemQuantity(productId);
+
+            return GestureDetector(
+              onTap: () {
+                recentlyViewedProvider.addToRecentlyViewed(product);
+                Navigator.pushNamed(
+                  context,
+                  AppRoutes.tmartProductDetail,
+                  arguments: {
+                    'product': product,
+                  },
+                );
+              },
+              child: TMartProductCard(
+                item: product,
+                quantity: quantity,
+                onAdd: () {
+                  martCartProvider.addItem(product, quantity: 1);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${product['name']} added to cart'),
+                      backgroundColor: const Color(0xFFFC8019),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                onIncrement: () {
+                  martCartProvider.updateQuantity(productId, quantity + 1);
+                },
+                onDecrement: () {
+                  if (quantity > 1) {
+                    martCartProvider.updateQuantity(productId, quantity - 1);
+                  } else {
+                    martCartProvider.removeItem(productId);
+                  }
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFC8019)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -393,11 +342,11 @@ class _TMartCategoryProductsScreenState extends State<TMartCategoryProductsScree
           ),
           const SizedBox(height: 16),
           Text(
-            'Error loading products',
+            'Oops! Something went wrong',
             style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[600],
+              color: Colors.black87,
             ),
           ),
           const SizedBox(height: 8),
@@ -405,21 +354,25 @@ class _TMartCategoryProductsScreenState extends State<TMartCategoryProductsScree
             _errorMessage,
             style: GoogleFonts.poppins(
               fontSize: 14,
-              color: Colors.grey[500],
+              color: Colors.grey[600],
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _loadProducts,
             style: ElevatedButton.styleFrom(
-              backgroundColor: swiggyOrange,
+              backgroundColor: const Color(0xFFFC8019),
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: Text(
-              'Retry',
+              'Try Again',
               style: GoogleFonts.poppins(
-                color: Colors.white,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -429,13 +382,13 @@ class _TMartCategoryProductsScreenState extends State<TMartCategoryProductsScree
     );
   }
 
-  Widget _buildEmptyWidget() {
+  Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.inbox_outlined,
+            Icons.inventory_2_outlined,
             size: 64,
             color: Colors.grey[400],
           ),
@@ -445,65 +398,39 @@ class _TMartCategoryProductsScreenState extends State<TMartCategoryProductsScree
             style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[600],
+              color: Colors.black87,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Try adjusting your search or filters',
+            'We couldn\'t find any products in this category',
             style: GoogleFonts.poppins(
               fontSize: 14,
-              color: Colors.grey[500],
+              color: Colors.grey[600],
             ),
             textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _loadProducts,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFC8019),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Refresh',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildProductsGrid(MartCartProvider martCartProvider) {
-    return RefreshIndicator(
-      onRefresh: _loadProducts,
-      child: GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 0.75,
-        ),
-        itemCount: _products.length,
-        itemBuilder: (context, index) {
-          final item = _products[index];
-          final String productId = item['_id'] ?? item['id'] ?? '';
-          final int quantity = martCartProvider.getItemQuantity(productId);
-          
-          // Debug: Print item structure if there are issues
-          if (item['name'] == null || item['price'] == null) {
-            print('⚠️ Product item missing required fields: $item');
-          }
-          
-          return TMartProductCard(
-            item: item,
-            quantity: quantity,
-            onAdd: () {
-              martCartProvider.addItem(item);
-            },
-            onIncrement: () {
-              martCartProvider.updateQuantity(productId, quantity + 1);
-            },
-            onDecrement: () {
-              if (quantity > 1) {
-                martCartProvider.updateQuantity(productId, quantity - 1);
-              } else {
-                martCartProvider.removeItem(productId);
-              }
-            },
-          );
-        },
-      ),
-    );
-  }
-
 } 

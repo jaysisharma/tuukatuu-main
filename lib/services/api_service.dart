@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/product.dart';
 import '../models/address.dart';
-import '../config/api_config.dart';
+import '../core/config/app_config.dart';
+import 'error_service.dart';
 
 class ApiService {
-  static const String baseUrl = ApiConfig.baseUrl;
+  static String get baseUrl => AppConfig.baseUrl;
 
   static Future<dynamic> get(String endpoint, {String? token, Map<String, String>? headers, Map<String, String>? params}) async {
     Uri uri = Uri.parse('$baseUrl$endpoint');
@@ -17,39 +18,71 @@ class ApiService {
     
     print('🌐 API GET Request: $uri'); // Debug log
     
-    final response = await http.get(
-      uri,
-      headers: _buildHeaders(token, headers),
-    );
-    
-    print('🌐 API Response Status: ${response.statusCode}'); // Debug log
-    return _handleResponse(response);
+    try {
+      final response = await http.get(
+        uri,
+        headers: _buildHeaders(token, headers),
+      );
+      
+      print('🌐 API Response Status: ${response.statusCode}'); // Debug log
+      return _handleResponse(response);
+    } catch (e) {
+      print('❌ API GET Error: $e');
+      final errorType = ErrorService.handleApiError(e);
+      // Don't expose the raw error message to users
+      final userMessage = ErrorService.getErrorMessage(errorType);
+      throw ApiException(errorType, userMessage, e.toString());
+    }
   }
 
   static Future<dynamic> post(String endpoint, {String? token, Map<String, dynamic>? body, Map<String, String>? headers}) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: _buildHeaders(token, headers, isJson: true),
-      body: body != null ? json.encode(body) : null,
-    );
-    return _handleResponse(response);
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: _buildHeaders(token, headers, isJson: true),
+        body: body != null ? json.encode(body) : null,
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      print('❌ API POST Error: $e');
+      final errorType = ErrorService.handleApiError(e);
+      // Don't expose the raw error message to users
+      final userMessage = ErrorService.getErrorMessage(errorType);
+      throw ApiException(errorType, userMessage, e.toString());
+    }
   }
 
   static Future<dynamic> put(String endpoint, Map<String, String> map, {String? token, Map<String, dynamic>? body, Map<String, String>? headers}) async {
-    final response = await http.put(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: _buildHeaders(token, headers, isJson: true),
-      body: body != null ? json.encode(body) : null,
-    );
-    return _handleResponse(response);
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: _buildHeaders(token, headers, isJson: true),
+        body: body != null ? json.encode(body) : null,
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      print('❌ API PUT Error: $e');
+      final errorType = ErrorService.handleApiError(e);
+      // Don't expose the raw error message to users
+      final userMessage = ErrorService.getErrorMessage(errorType);
+      throw ApiException(errorType, userMessage, e.toString());
+    }
   }
 
   static Future<dynamic> delete(String endpoint, {String? token, Map<String, String>? headers}) async {
-    final response = await http.delete(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: _buildHeaders(token, headers),
-    );
-    return _handleResponse(response);
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: _buildHeaders(token, headers),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      print('❌ API DELETE Error: $e');
+      final errorType = ErrorService.handleApiError(e);
+      // Don't expose the raw error message to users
+      final userMessage = ErrorService.getErrorMessage(errorType);
+      throw ApiException(errorType, userMessage, e.toString());
+    }
   }
 
   static Future<List<BannerModel>> getBanners() async {
@@ -233,11 +266,24 @@ class ApiService {
 
   // Address API methods
   static Future<List<Address>> getAddresses(String token) async {
-    final res = await get('/addresses', token: token);
-    if (res is List) {
-      return res.map((e) => Address.fromJson(e)).toList();
+    print('🔍 ApiService: Calling getAddresses with token: ${token.substring(0, 10)}...');
+    try {
+      final res = await get('/addresses', token: token);
+      print('🔍 ApiService: getAddresses response type: ${res.runtimeType}');
+      print('🔍 ApiService: getAddresses response: $res');
+      
+      if (res is List) {
+        final addresses = res.map((e) => Address.fromJson(e)).toList();
+        print('🔍 ApiService: Successfully parsed ${addresses.length} addresses');
+        return addresses;
+      } else {
+        print('❌ ApiService: Unexpected response type: ${res.runtimeType}');
+        return [];
+      }
+    } catch (e) {
+      print('❌ ApiService: Error in getAddresses: $e');
+      rethrow;
     }
-    return [];
   }
 
   static Future<Address> createAddress(String token, Map<String, dynamic> body, {Map<String, String>? headers}) async {
@@ -404,18 +450,44 @@ class ApiService {
   static dynamic _handleResponse(http.Response response) {
     try {
       final data = json.decode(response.body);
+      
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return data;
       } else {
-        final message = data['message'] ?? 'Unknown error occurred';
-        throw Exception('${response.statusCode}: $message');
+        // Handle different error responses
+        String errorMessage = 'Unknown error occurred';
+        String errorType = ErrorService.handleHttpStatus(response.statusCode);
+        
+        if (data is Map<String, dynamic>) {
+          errorMessage = data['message'] ?? data['error'] ?? errorMessage;
+          
+          // Check for specific error types in the response
+          if (data['errorType'] != null) {
+            errorType = data['errorType'];
+          }
+        }
+        
+        // Log the error for debugging
+        ErrorService.logError(errorType, errorMessage, {
+          'statusCode': response.statusCode,
+          'endpoint': response.request?.url.toString(),
+          'responseBody': response.body,
+        });
+        
+        throw ApiException(errorType, errorMessage);
       }
     } catch (e) {
+      if (e is ApiException) {
+        rethrow;
+      }
+      
       if (e is FormatException) {
         print('❌ FormatException: ${response.body}');
-        throw Exception('Invalid response format from server (${response.statusCode})');
+        throw ApiException(ErrorService.serverError, 'Invalid response format from server');
       }
-      rethrow;
+      
+      // Handle other parsing errors
+      throw ApiException(ErrorService.unknownError, 'Failed to process server response');
     }
   }
 
@@ -433,5 +505,19 @@ class ApiService {
         await Future.delayed(Duration(milliseconds: 1000 * attempts));
       }
     }
+  }
+}
+
+// Custom exception class for API errors
+class ApiException implements Exception {
+  final String errorType;
+  final String message;
+  final String? originalError;
+
+  ApiException(this.errorType, this.message, [this.originalError]);
+
+  @override
+  String toString() {
+    return 'ApiException: $errorType - $message';
   }
 } 

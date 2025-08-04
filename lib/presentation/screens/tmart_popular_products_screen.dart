@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:tuukatuu/providers/mart_cart_provider.dart';
 import 'package:tuukatuu/presentation/widgets/tmart_product_card.dart';
 import 'package:tuukatuu/services/api_service.dart';
+import 'package:tuukatuu/presentation/screens/tmart_cart_screen.dart';
+import 'package:tuukatuu/routes.dart';
 
 class TMartPopularProductsScreen extends StatefulWidget {
   const TMartPopularProductsScreen({super.key});
@@ -22,8 +24,6 @@ class _TMartPopularProductsScreenState extends State<TMartPopularProductsScreen>
 
   // Swiggy color scheme
   static const Color swiggyOrange = Color(0xFFFC8019);
-  static const Color swiggyRed = Color(0xFFE23744);
-  static const Color swiggyDark = Color(0xFF1C1C1C);
   static const Color swiggyLight = Color(0xFFF8F9FA);
 
   @override
@@ -38,7 +38,7 @@ class _TMartPopularProductsScreenState extends State<TMartPopularProductsScreen>
     super.dispose();
   }
 
-  Future<void> _loadProducts() async {
+  Future<void> _loadProducts({bool shuffle = false}) async {
     setState(() {
       _isLoading = true;
       _hasError = false;
@@ -48,6 +48,7 @@ class _TMartPopularProductsScreenState extends State<TMartPopularProductsScreen>
       final response = await ApiService.get('/tmart/popular', params: {
         'limit': '50',
         'sort': _sortBy,
+        'shuffle': shuffle.toString(),
       });
 
       if (response['success']) {
@@ -55,7 +56,8 @@ class _TMartPopularProductsScreenState extends State<TMartPopularProductsScreen>
           _products = List<Map<String, dynamic>>.from(response['data'] ?? []);
           _isLoading = false;
         });
-        print('✅ Loaded ${_products.length} popular products');
+        
+        print('🏆 Loaded ${_products.length} popular products (shuffled: ${response['shuffled'] ?? false})');
       } else {
         setState(() {
           _hasError = true;
@@ -64,7 +66,6 @@ class _TMartPopularProductsScreenState extends State<TMartPopularProductsScreen>
         });
       }
     } catch (e) {
-      print('❌ Error loading popular products: $e');
       setState(() {
         _hasError = true;
         _errorMessage = 'Network error: ${e.toString()}';
@@ -173,6 +174,11 @@ class _TMartPopularProductsScreenState extends State<TMartPopularProductsScreen>
               ),
               actions: [
                 IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.white),
+                  onPressed: () => _loadProducts(shuffle: true),
+                  tooltip: 'Refresh with shuffle',
+                ),
+                IconButton(
                   icon: const Icon(Icons.search, color: Colors.white),
                   onPressed: () {
                     _showSearchDialog();
@@ -181,6 +187,12 @@ class _TMartPopularProductsScreenState extends State<TMartPopularProductsScreen>
                 IconButton(
                   icon: const Icon(Icons.sort, color: Colors.white),
                   onPressed: _showSortDialog,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.shopping_cart, color: Colors.white),
+                  onPressed: () {
+                    Navigator.pushNamed(context, AppRoutes.tmartCart);
+                  },
                 ),
               ],
             ),

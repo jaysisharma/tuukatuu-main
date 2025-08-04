@@ -22,6 +22,9 @@ const productSchema = new mongoose.Schema({
   isNewArrival: { type: Boolean, default: false },
   featuredOrder: { type: Number, default: 0 },
   vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  // Vendor type information for better categorization
+  vendorType: { type: String, enum: ['restaurant', 'store'] },
+  vendorSubType: { type: String }, // chinese, italian, grocery, pharmacy, etc.
   dealTag: { type: String }, // e.g., 'Buy 1 Get 1', '₹99 Store'
   dealExpiresAt: { type: Date },
   // Dietary information
@@ -172,6 +175,7 @@ productSchema.statics.seedVendorProducts = async function(vendors) {
       isAvailable: true,
       deliveryFee: 20,
       images: [],
+      stock: 50,
       vendorId: vendors[0]._id,
     },
     {
@@ -185,6 +189,7 @@ productSchema.statics.seedVendorProducts = async function(vendors) {
       isAvailable: true,
       deliveryFee: 15,
       images: [],
+      stock: 30,
       vendorId: vendors[0]._id,
     },
     {
@@ -628,15 +633,26 @@ productSchema.statics.seedVendorProducts = async function(vendors) {
   return await this.insertMany(products);
 };
 
-// Static method to get popular products
-productSchema.statics.getPopularProducts = async function(limit = 10) {
-  return await this.find({ 
-    isPopular: true, 
-    isAvailable: true 
+// Static method to get popular products with enhanced logic
+productSchema.statics.getPopularProducts = async function(limit = 10, shuffle = false) {
+  let products = await this.find({ 
+    isAvailable: true,
+    $or: [
+      { isPopular: true },
+      { rating: { $gte: 4.0 }, reviews: { $gte: 5 } },
+      { isFeatured: true }
+    ]
   })
-  .sort({ rating: -1, reviews: -1 })
-  .limit(limit)
+  .sort({ rating: -1, reviews: -1, isPopular: -1 })
+  .limit(limit * 2) // Get more to allow for shuffling
   .populate('vendorId', 'storeName storeRating');
+  
+  // Shuffle if requested
+  if (shuffle) {
+    products = products.sort(() => Math.random() - 0.5);
+  }
+  
+  return products.slice(0, limit);
 };
 
 // Static method to get featured popular products
@@ -648,6 +664,62 @@ productSchema.statics.getFeaturedPopularProducts = async function(limit = 8) {
   .sort({ featuredOrder: 1, rating: -1, reviews: -1 })
   .limit(limit)
   .populate('vendorId', 'storeName storeRating');
+};
+
+// Static method to get recommended products with smart shuffling
+productSchema.statics.getRecommendedProducts = async function(limit = 12, userId = null) {
+  try {
+    // Get a diverse mix of products based on different criteria
+    const criteria = [
+      // High-rated products
+      { rating: { $gte: 4.2 }, reviews: { $gte: 3 } },
+      // Popular products
+      { isPopular: true },
+      // Featured products
+      { isFeatured: true },
+      // New arrivals
+      { isNewArrival: true },
+      // Best sellers
+      { isBestSeller: true },
+      // Products with good ratings
+      { rating: { $gte: 3.8 }, reviews: { $gte: 2 } }
+    ];
+    
+    let allProducts = [];
+    
+    // Get products for each criteria
+    for (const criterion of criteria) {
+      const products = await this.find({
+        ...criterion,
+        isAvailable: true
+      })
+      .sort({ rating: -1, reviews: -1, createdAt: -1 })
+      .limit(Math.ceil(limit / criteria.length))
+      .populate('vendorId', 'storeName storeRating');
+      
+      allProducts = [...allProducts, ...products];
+    }
+    
+    // Remove duplicates based on product ID
+    const uniqueProducts = [];
+    const seenIds = new Set();
+    
+    for (const product of allProducts) {
+      if (!seenIds.has(product._id.toString())) {
+        seenIds.add(product._id.toString());
+        uniqueProducts.push(product);
+      }
+    }
+    
+    // Shuffle the products for variety
+    const shuffledProducts = uniqueProducts.sort(() => Math.random() - 0.5);
+    
+    return shuffledProducts.slice(0, limit);
+  } catch (error) {
+    console.error('Error getting recommended products:', error);
+    // Fallback to popular products
+    return await this.getPopularProducts(limit, true);
+  }
 };
 
 module.exports = mongoose.model('Product', productSchema); 

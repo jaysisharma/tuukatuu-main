@@ -33,6 +33,7 @@ import Login from './pages/Login';
 import NotFound from './pages/NotFound';
 import VendorDetailsPage from './pages/admin/VendorDetails';
 import SalesAnalytics from './pages/admin/SalesAnalytics';
+import TodayDeals from './pages/admin/TodayDeals';
 import AnalyticsAndSummary from './pages/vendor/AnalyticsAndSummary';
 import './App.css';
 
@@ -70,6 +71,7 @@ function AppRoutes() {
                   <Route path="featured-categories" element={<FeaturedCategories />} />
                   <Route path="coupons" element={<Coupons />} />
                   <Route path="banners" element={<Banners />} />
+                  <Route path="today-deals" element={<TodayDeals />} />
         <Route path="settings" element={<Settings />} />
         <Route path="sales-analytics" element={<SalesAnalytics />} />
       </Route>

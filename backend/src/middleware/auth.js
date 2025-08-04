@@ -1,12 +1,22 @@
 const jwt = require('jsonwebtoken');
 
 function authenticateToken(req, res, next) {
+  console.log('🔍 Auth Middleware: Checking authentication for path:', req.path);
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ message: 'No token provided' });
+  
+  if (!token) {
+    console.log('❌ Auth Middleware: No token provided');
+    return res.status(401).json({ message: 'No token provided' });
+  }
 
+  console.log('🔍 Auth Middleware: Token found, verifying...');
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: 'Invalid token' });
+    if (err) {
+      console.log('❌ Auth Middleware: Invalid token:', err.message);
+      return res.status(403).json({ message: 'Invalid token' });
+    }
+    console.log('🔍 Auth Middleware: Token verified for user:', user.id);
     req.user = user;
     next();
   });

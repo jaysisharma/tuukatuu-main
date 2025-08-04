@@ -2,18 +2,21 @@ import 'package:flutter/material.dart';
 import '../models/enhanced_order.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../services/error_service.dart';
 
 class OrderProvider extends ChangeNotifier {
   List<EnhancedOrder> _orders = [];
   List<EnhancedOrder> _activeOrders = [];
   bool _isLoading = false;
   String? _error;
+  String? _errorType;
   EnhancedOrder? _currentOrder;
 
   List<EnhancedOrder> get orders => _orders;
   List<EnhancedOrder> get activeOrders => _activeOrders;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  String? get errorType => _errorType;
   EnhancedOrder? get currentOrder => _currentOrder;
 
   int get totalOrders => _orders.length;
@@ -40,10 +43,14 @@ class OrderProvider extends ChangeNotifier {
         _orders.sort((a, b) => b.orderDate.compareTo(a.orderDate));
         _activeOrders.sort((a, b) => b.orderDate.compareTo(a.orderDate));
       } else {
-        _setError(response['message'] ?? 'Failed to fetch orders');
+        _setError(response['message'] ?? 'Failed to fetch orders', ErrorService.orderError);
       }
     } catch (e) {
-      _setError('Error fetching orders: $e');
+      if (e is ApiException) {
+        _setError(e.message, e.errorType);
+      } else {
+        _setError('Error fetching orders', ErrorService.unknownError);
+      }
     } finally {
       _setLoading(false);
     }
@@ -61,11 +68,15 @@ class OrderProvider extends ChangeNotifier {
         _currentOrder = EnhancedOrder.fromJson(response['data']);
         return _currentOrder;
       } else {
-        _setError(response['message'] ?? 'Failed to fetch order');
+        _setError(response['message'] ?? 'Failed to fetch order', ErrorService.orderError);
         return null;
       }
     } catch (e) {
-      _setError('Error fetching order: $e');
+      if (e is ApiException) {
+        _setError(e.message, e.errorType);
+      } else {
+        _setError('Error fetching order', ErrorService.unknownError);
+      }
       return null;
     } finally {
       _setLoading(false);
@@ -88,11 +99,15 @@ class OrderProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _setError(response['message'] ?? 'Failed to create order');
+        _setError(response['message'] ?? 'Failed to create order', ErrorService.orderError);
         return false;
       }
     } catch (e) {
-      _setError('Error creating order: $e');
+      if (e is ApiException) {
+        _setError(e.message, e.errorType);
+      } else {
+        _setError('Error creating order', ErrorService.orderError);
+      }
       return false;
     } finally {
       _setLoading(false);
@@ -100,104 +115,194 @@ class OrderProvider extends ChangeNotifier {
   }
 
   // Cancel an order
-  Future<bool> cancelOrder(String orderId, {String? token}) async {
+  Future<bool> cancelOrder(String orderId, {String? token, String? reason}) async {
     _setLoading(true);
     _clearError();
 
     try {
-      final response = await ApiService.put('/orders/$orderId/cancel', {}, token: token);
+      final cancelData = <String, dynamic>{};
+      if (reason != null && reason.isNotEmpty) {
+        cancelData['reason'] = reason;
+      }
+
+      final response = await ApiService.put('/orders/$orderId/cancel', {}, token: token, body: cancelData);
       
       if (response['success']) {
-        final updatedOrder = EnhancedOrder.fromJson(response['data']);
-        
-        // Update the order in the lists
+        // Update the order in our lists
         final orderIndex = _orders.indexWhere((order) => order.id == orderId);
         if (orderIndex != -1) {
-          _orders[orderIndex] = updatedOrder;
+          _orders[orderIndex] = EnhancedOrder.fromJson(response['data']);
+          _orders = List.from(_orders); // Trigger notifyListeners
         }
         
-        // Remove from active orders if cancelled
-        _activeOrders.removeWhere((order) => order.id == orderId);
+        // Update active orders
+        _activeOrders = _orders.where((order) => order.isActive).toList();
         
         // Update current order if it's the one being cancelled
         if (_currentOrder?.id == orderId) {
-          _currentOrder = updatedOrder;
+          _currentOrder = EnhancedOrder.fromJson(response['data']);
         }
         
         notifyListeners();
         return true;
       } else {
-        _setError(response['message'] ?? 'Failed to cancel order');
+        _setError(response['message'] ?? 'Failed to cancel order', ErrorService.orderError);
         return false;
       }
     } catch (e) {
-      _setError('Error cancelling order: $e');
+      if (e is ApiException) {
+        _setError(e.message, e.errorType);
+      } else {
+        _setError('Error cancelling order', ErrorService.orderError);
+      }
       return false;
     } finally {
       _setLoading(false);
     }
   }
 
-  // Update order status (for real-time updates)
-  void updateOrderStatus(String orderId, OrderStatus newStatus) {
-    final orderIndex = _orders.indexWhere((order) => order.id == orderId);
-    if (orderIndex != -1) {
-      final order = _orders[orderIndex];
-      final oldStatus = order.status;
+  // Update order status
+  Future<bool> updateOrderStatus(String orderId, OrderStatus status, {String? token, String? note}) async {
+    try {
+      final statusData = <String, dynamic>{
+        'status': status.toString().split('.').last,
+      };
+      if (note != null && note.isNotEmpty) {
+        statusData['note'] = note;
+      }
+
+      final response = await ApiService.put('/orders/$orderId/status', {}, token: token, body: statusData);
       
-      // Create a new order with updated status
-      final updatedOrder = EnhancedOrder(
-        id: order.id,
-        userId: order.userId,
-        vendorId: order.vendorId,
-        vendorName: order.vendorName,
-        vendorImage: order.vendorImage,
-        items: order.items,
-        itemTotal: order.itemTotal,
-        tax: order.tax,
-        deliveryFee: order.deliveryFee,
-        tip: order.tip,
-        total: order.total,
-        status: newStatus,
-        orderDate: order.orderDate,
-        deliveryDate: order.deliveryDate,
-        deliveryAddress: order.deliveryAddress,
-        customerLocation: order.customerLocation,
-        instructions: order.instructions,
-        paymentMethod: order.paymentMethod,
-        paymentStatus: order.paymentStatus,
-        riderId: order.riderId,
-        riderName: order.riderName,
-        riderPhone: order.riderPhone,
-        trackingInfo: order.trackingInfo,
-        statusHistory: order.statusHistory,
-      );
-      
-      _orders[orderIndex] = updatedOrder;
-      
-      // Update active orders list
-      if (updatedOrder.isActive) {
-        final activeIndex = _activeOrders.indexWhere((order) => order.id == orderId);
-        if (activeIndex != -1) {
-          _activeOrders[activeIndex] = updatedOrder;
-        } else {
-          _activeOrders.insert(0, updatedOrder);
+      if (response['success']) {
+        // Update the order in our lists
+        final orderIndex = _orders.indexWhere((order) => order.id == orderId);
+        if (orderIndex != -1) {
+          _orders[orderIndex] = EnhancedOrder.fromJson(response['data']);
+          _orders = List.from(_orders); // Trigger notifyListeners
         }
+        
+        // Update active orders
+        _activeOrders = _orders.where((order) => order.isActive).toList();
+        
+        // Update current order if it's the one being updated
+        if (_currentOrder?.id == orderId) {
+          _currentOrder = EnhancedOrder.fromJson(response['data']);
+        }
+        
+        // Show notification for status change
+        _showOrderStatusNotification(orderId, status);
+        
+        notifyListeners();
+        return true;
       } else {
-        _activeOrders.removeWhere((order) => order.id == orderId);
+        _setError(response['message'] ?? 'Failed to update order status', ErrorService.orderError);
+        return false;
       }
-      
-      // Update current order if it's the one being updated
-      if (_currentOrder?.id == orderId) {
-        _currentOrder = updatedOrder;
+    } catch (e) {
+      if (e is ApiException) {
+        _setError(e.message, e.errorType);
+      } else {
+        _setError('Error updating order status', ErrorService.orderError);
       }
+      return false;
+    }
+  }
+
+  // Track order
+  Future<Map<String, dynamic>?> trackOrder(String orderId, {String? token}) async {
+    try {
+      final response = await ApiService.get('/orders/$orderId/track', token: token);
       
-      // Show notification if status changed
-      if (oldStatus != newStatus) {
-        _showOrderStatusNotification(orderId, newStatus);
+      if (response['success']) {
+        return response['data'];
+      } else {
+        _setError(response['message'] ?? 'Failed to track order', ErrorService.orderError);
+        return null;
       }
+    } catch (e) {
+      if (e is ApiException) {
+        _setError(e.message, e.errorType);
+      } else {
+        _setError('Error tracking order', ErrorService.orderError);
+      }
+      return null;
+    }
+  }
+
+  // Rate order
+  Future<bool> rateOrder(String orderId, int rating, {String? comment, String? token}) async {
+    try {
+      final ratingData = <String, dynamic>{
+        'rating': rating,
+      };
+      if (comment != null && comment.isNotEmpty) {
+        ratingData['comment'] = comment;
+      }
+
+      final response = await ApiService.post('/orders/$orderId/rate', token: token, body: ratingData);
       
-      notifyListeners();
+      if (response['success']) {
+        // Update the order in our lists
+        final orderIndex = _orders.indexWhere((order) => order.id == orderId);
+        if (orderIndex != -1) {
+          _orders[orderIndex] = EnhancedOrder.fromJson(response['data']);
+          _orders = List.from(_orders); // Trigger notifyListeners
+        }
+        
+        // Update current order if it's the one being rated
+        if (_currentOrder?.id == orderId) {
+          _currentOrder = EnhancedOrder.fromJson(response['data']);
+        }
+        
+        notifyListeners();
+        return true;
+      } else {
+        _setError(response['message'] ?? 'Failed to rate order', ErrorService.orderError);
+        return false;
+      }
+    } catch (e) {
+      if (e is ApiException) {
+        _setError(e.message, e.errorType);
+      } else {
+        _setError('Error rating order', ErrorService.orderError);
+      }
+      return false;
+    }
+  }
+
+  // Refresh order status (for real-time updates)
+  Future<void> refreshOrderStatus(String orderId, {String? token}) async {
+    try {
+      final response = await ApiService.get('/orders/$orderId', token: token);
+      
+      if (response['success']) {
+        final updatedOrder = EnhancedOrder.fromJson(response['data']);
+        
+        // Update the order in our lists
+        final orderIndex = _orders.indexWhere((order) => order.id == orderId);
+        if (orderIndex != -1) {
+          final oldStatus = _orders[orderIndex].status;
+          _orders[orderIndex] = updatedOrder;
+          
+          // Check if status changed and show notification
+          if (oldStatus != updatedOrder.status) {
+            _showOrderStatusNotification(orderId, updatedOrder.status);
+          }
+        }
+        
+        // Update active orders
+        _activeOrders = _orders.where((order) => order.isActive).toList();
+        
+        // Update current order if it's the one being refreshed
+        if (_currentOrder?.id == orderId) {
+          _currentOrder = updatedOrder;
+        }
+        
+        notifyListeners();
+      }
+    } catch (e) {
+      // Don't show error for refresh operations, just log it
+      print('Error refreshing order status: $e');
     }
   }
 
@@ -262,12 +367,14 @@ class OrderProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _setError(String error) {
+  void _setError(String error, String errorType) {
     _error = error;
+    _errorType = errorType;
     notifyListeners();
   }
 
   void _clearError() {
     _error = null;
+    _errorType = null;
   }
-} 
+}

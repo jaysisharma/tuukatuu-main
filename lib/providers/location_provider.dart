@@ -1,108 +1,105 @@
-import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geolocator/geolocator.dart';
-import '../models/address.dart';
-import '../services/api_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LocationProvider with ChangeNotifier {
-  final CameraPosition initialPosition = const CameraPosition(
-    target: LatLng(28.6139, 77.2090),
-    zoom: 14,
-  );
+  String? _deliveryAddress;
+  double? _deliveryLatitude;
+  double? _deliveryLongitude;
+  String? _deliveryLabel;
+  bool _isLoading = false;
 
-  GoogleMapController? _mapController;
-  LatLng? selectedPosition;
-  List<Address> addresses = [];
-  bool isLoading = false;
+  // Getters
+  String? get deliveryAddress => _deliveryAddress;
+  double? get deliveryLatitude => _deliveryLatitude;
+  double? get deliveryLongitude => _deliveryLongitude;
+  String? get deliveryLabel => _deliveryLabel;
+  bool get isLoading => _isLoading;
+  bool get hasDeliveryLocation => _deliveryAddress != null && _deliveryLatitude != null && _deliveryLongitude != null;
 
-  void onMapCreated(GoogleMapController controller) {
-    _mapController = controller;
-  }
-
-  void updateMapPosition(CameraPosition position) {
-    selectedPosition = position.target;
-    notifyListeners();
-  }
-
-  Future<void> useCurrentLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    LocationPermission permission = await Geolocator.checkPermission();
-
-    if (!serviceEnabled || permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    if (permission == LocationPermission.whileInUse ||
-        permission == LocationPermission.always) {
-      Position position = await Geolocator.getCurrentPosition();
-      selectedPosition = LatLng(position.latitude, position.longitude);
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLng(selectedPosition!),
-      );
-      notifyListeners();
-    }
-  }
-
-  Future<void> fetchAddresses(String token) async {
-    isLoading = true;
-    notifyListeners();
+  // Initialize from shared preferences
+  Future<void> initialize() async {
     try {
-      addresses = await ApiService.getAddresses(token);
-    } finally {
-      isLoading = false;
+      final prefs = await SharedPreferences.getInstance();
+      _deliveryAddress = prefs.getString('delivery_address');
+      _deliveryLatitude = prefs.getDouble('delivery_latitude');
+      _deliveryLongitude = prefs.getDouble('delivery_longitude');
+      _deliveryLabel = prefs.getString('delivery_label');
       notifyListeners();
+    } catch (e) {
+      print('❌ Error initializing location provider: $e');
     }
   }
 
-  // Future<void> addAddress(String token, Address address) async {
-  //   isLoading = true;
-  //   notifyListeners();
-  //   try {
-  //     final newAddress = await ApiService.addAddress(token, address);
-  //     addresses.insert(0, newAddress);
-  //   } finally {
-  //     isLoading = false;
-  //     notifyListeners();
-  //   }
-  // }
-
-  // Future<void> updateAddress(String token, Address address) async {
-  //   isLoading = true;
-  //   notifyListeners();
-  //   try {
-  //     final updated = await ApiService.updateAddress(token, address);
-  //     final idx = addresses.indexWhere((a) => a.id == address.id);
-  //     if (idx != -1) addresses[idx] = updated;
-  //   } finally {
-  //     isLoading = false;
-  //     notifyListeners();
-  //   }
-  // }
-
-  Future<void> deleteAddress(String token, String id) async {
-    isLoading = true;
-    notifyListeners();
+  // Set delivery location
+  Future<void> setDeliveryLocation({
+    required String address,
+    required double latitude,
+    required double longitude,
+    String? label,
+  }) async {
+    _setLoading(true);
+    
     try {
-      await ApiService.deleteAddress(token, id);
-      addresses.removeWhere((a) => a.id == id);
-    } finally {
-      isLoading = false;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('delivery_address', address);
+      await prefs.setDouble('delivery_latitude', latitude);
+      await prefs.setDouble('delivery_longitude', longitude);
+      if (label != null) {
+        await prefs.setString('delivery_label', label);
+      }
+
+      _deliveryAddress = address;
+      _deliveryLatitude = latitude;
+      _deliveryLongitude = longitude;
+      _deliveryLabel = label;
+      
+      _clearLoading();
       notifyListeners();
+    } catch (e) {
+      print('❌ Error setting delivery location: $e');
+      _clearLoading();
     }
   }
 
-  Future<void> setDefaultAddress(String token, String id) async {
-    isLoading = true;
-    notifyListeners();
+  // Clear delivery location
+  Future<void> clearDeliveryLocation() async {
     try {
-      final updated = await ApiService.setDefaultAddress(token, id);
-      final idx = addresses.indexWhere((a) => a.id == id);
-      if (idx != -1) addresses[idx] = updated;
-      // Optionally, refetch all addresses to update isDefault flags
-      await fetchAddresses(token);
-    } finally {
-      isLoading = false;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('delivery_address');
+      await prefs.remove('delivery_latitude');
+      await prefs.remove('delivery_longitude');
+      await prefs.remove('delivery_label');
+
+      _deliveryAddress = null;
+      _deliveryLatitude = null;
+      _deliveryLongitude = null;
+      _deliveryLabel = null;
+      
       notifyListeners();
+    } catch (e) {
+      print('❌ Error clearing delivery location: $e');
     }
+  }
+
+  // Get delivery location as map
+  Map<String, dynamic>? getDeliveryLocationMap() {
+    if (!hasDeliveryLocation) return null;
+    
+    return {
+      'address': _deliveryAddress,
+      'latitude': _deliveryLatitude,
+      'longitude': _deliveryLongitude,
+      'label': _deliveryLabel ?? 'Delivery Location',
+    };
+  }
+
+  // Private helper methods
+  void _setLoading(bool loading) {
+    _isLoading = loading;
+    notifyListeners();
+  }
+
+  void _clearLoading() {
+    _isLoading = false;
   }
 }

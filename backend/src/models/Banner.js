@@ -7,6 +7,12 @@ const bannerSchema = new mongoose.Schema({
   link: { type: String },
   isActive: { type: Boolean, default: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  priority: { type: Number, default: 1 },
+  category: { type: String, enum: ['restaurant', 'grocery', 'pharmacy', 'general'], default: 'general' },
+  backgroundColor: { type: String, default: '#FF6B35' },
+  textColor: { type: String, default: '#FFFFFF' },
+  startDate: { type: Date },
+  endDate: { type: Date },
 }, { timestamps: true });
 
 bannerSchema.statics.seedBanners = async function(adminId) {

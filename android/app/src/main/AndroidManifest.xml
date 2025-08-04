@@ -7,9 +7,9 @@
     
     <!-- ✅ For exact alarms (optional, needed for scheduled notifications) -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-    
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <application
-        android:label="tuukatuu"
+        android:label="Tukatuu"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -29,6 +29,12 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <meta-data
+                android:name="com.baato.api.key"
+                android:value="c4NQriUA4yoDwdocKtxMB4dwZyoR7uA2jLAo43fTIa4z" />
+            <meta-data
+                android:name="com.google.android.geo.API_KEY"
+                android:value="AIzaSyD-03o_xk_19Gc5x2N0G3Miz_67oL4H1Y8" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

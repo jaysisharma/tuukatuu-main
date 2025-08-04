@@ -5,7 +5,9 @@ const { validateCoordinates } = require('../utils/locationUtils');
 // ✅ Get all addresses for the authenticated user
 exports.getAddresses = async (req, res) => {
   try {
+    console.log('🔍 Backend: getAddresses called for user:', req.user.id);
     const addresses = await addressesService.findAddressesForUser(req.user.id);
+    console.log('🔍 Backend: Found ${addresses.length} addresses for user');
     res.json(addresses);
   } catch (error) {
     console.error('Error fetching addresses:', error);

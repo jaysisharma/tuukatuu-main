@@ -6,16 +6,24 @@ import 'presentation/screens/tmart_search_screen.dart';
 import 'presentation/screens/tmart_category_products_screen.dart';
 import 'presentation/screens/tmart_categories_screen.dart';
 import 'presentation/screens/tmart_popular_products_screen.dart';
+import 'presentation/screens/tmart_recommended_products_screen.dart';
+import 'presentation/screens/tmart_product_detail_screen.dart';
 import 'presentation/screens/favorites_screen.dart';
 import 'presentation/screens/orders/orders_screen.dart';
 import 'presentation/screens/orders/order_tracking.dart';
 import 'presentation/screens/store_details_screen.dart';
 import 'presentation/screens/cart/cart_screen.dart';
+import 'presentation/screens/unified_cart_screen.dart';
+import 'presentation/screens/multi_store_cart_screen.dart';
+import 'presentation/screens/tmart_dedicated_cart_screen.dart';
+import 'presentation/screens/t_mart_clean_screen.dart';
 import 'presentation/screens/checkout_screen.dart';
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/screens/auth/signup_screen.dart';
 import 'presentation/screens/profile/profile_screen.dart';
 import 'presentation/screens/location/location_screen.dart';
+import 'presentation/screens/notifications/notification_screen.dart';
+import 'presentation/screens/notifications/notification_screen.dart';
 import 'screens/category_products_screen.dart';
 import 'presentation/screens/daily_essentials_page.dart';
 import 'presentation/screens/recently_viewed_page.dart';
@@ -24,20 +32,24 @@ class AppRoutes {
   static const String home = '/';
   static const String tMart = '/t-mart';
   static const String tmartCart = '/tmart-cart';
+  static const String tmartProductDetail = '/tmart-product-detail';
   static const String tmartSearch = '/tmart-search';
   static const String tmartCategoryProducts = '/tmart-category-products';
   static const String tmartCategories = '/tmart-categories';
   static const String tmartPopularProducts = '/tmart-popular-products';
+  static const String tmartRecommendedProducts = '/tmart-recommended-products';
   static const String favorites = '/favorites';
   static const String orders = '/orders';
   static const String orderTracking = '/order-tracking';
   static const String storeDetails = '/store-details';
   static const String location = '/location';
   static const String cart = '/cart';
+  static const String unifiedCart = '/unified-cart';
   static const String checkout = '/checkout';
   static const String categoryProducts = '/category-products';
   static const String login = '/login';
   static const String signup = '/signup';
+  static const String notifications = '/notifications';
   static const String profile = '/profile';
   static const String dailyEssentialsPage = '/daily-essentials-page';
   static const String recentlyViewedPage = '/recently-viewed-page';
@@ -47,13 +59,28 @@ class AppRoutes {
       case home:
         return MaterialPageRoute(builder: (_) => const HomeScreen());
       case tMart:
-        return MaterialPageRoute(builder: (_) => const TMartScreen());
+        return MaterialPageRoute(builder: (_) => const TMartCleanScreen());
       case tmartCart:
         return MaterialPageRoute(builder: (_) => const TMartCartScreen());
+      case tmartProductDetail:
+        if (settings.arguments != null) {
+          final args = settings.arguments as Map<String, dynamic>;
+          final product = args['product'] as Map<String, dynamic>;
+          return MaterialPageRoute(
+            builder: (_) => TMartProductDetailScreen(product: product),
+          );
+        }
+        return MaterialPageRoute(
+          builder: (_) => const Scaffold(
+            body: Center(child: Text('Product details not found')),
+          ),
+        );
       case tmartCategories:
         return MaterialPageRoute(builder: (_) => const TMartCategoriesScreen());
       case tmartPopularProducts:
         return MaterialPageRoute(builder: (_) => const TMartPopularProductsScreen());
+      case tmartRecommendedProducts:
+        return MaterialPageRoute(builder: (_) => const TMartRecommendedProductsScreen());
       case tmartSearch:
         if (settings.arguments != null) {
           final searchQuery = settings.arguments as String;
@@ -124,12 +151,14 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const LoginScreen());
       case signup:
         return MaterialPageRoute(builder: (_) => const SignUpScreen());
+      case notifications:
+        return MaterialPageRoute(builder: (_) => const NotificationScreen());
       case profile:
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
       case location:
         return MaterialPageRoute(builder: (_) => const LocationScreen());
       case cart:
-        return MaterialPageRoute(builder: (_) => const CartScreen());
+        return MaterialPageRoute(builder: (_) => const TMartDedicatedCartScreen());
       case checkout:
         if (settings.arguments != null) {
           final args = settings.arguments as Map<String, dynamic>;

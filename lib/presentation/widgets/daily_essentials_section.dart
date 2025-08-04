@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
-import '../../providers/mart_cart_provider.dart';
+import '../../providers/unified_cart_provider.dart';
 
 class DailyEssentialsSection extends StatefulWidget {
-  final MartCartProvider? martCartProvider;
+  final UnifiedCartProvider? martCartProvider;
   
   const DailyEssentialsSection({
     Key? key, 
@@ -32,14 +32,13 @@ class _DailyEssentialsSectionState extends State<DailyEssentialsSection> {
         _hasError = false;
       });
 
-      final response = await ApiService.get('/daily-essentials');
+      // Load vendor products for fast delivery daily essentials
+      final response = await ApiService.get('/products');
       
-      if (response['success']) {
-        // Filter to only show featured daily essentials
-        final allEssentials = List<Map<String, dynamic>>.from(response['data']);
-        final featuredEssentials = allEssentials.where((product) => 
-          product['isFeaturedDailyEssential'] == true
-        ).toList();
+      if (response is List) {
+        final allEssentials = List<Map<String, dynamic>>.from(response);
+        // Take first 8 products for daily essentials
+        final featuredEssentials = allEssentials.take(8).toList();
         
         setState(() {
           _dailyEssentials = featuredEssentials;
@@ -70,7 +69,7 @@ class _DailyEssentialsSectionState extends State<DailyEssentialsSection> {
     
     // Get quantity for this product from cart provider
     final productId = product['_id']?.toString() ?? '';
-    final quantity = widget.martCartProvider?.getItemQuantity(productId) ?? 0;
+    final quantity = widget.martCartProvider?.getItemQuantity(productId, CartItemType.tmart) ?? 0;
 
     return Container(
       width: 140,
@@ -174,7 +173,14 @@ class _DailyEssentialsSectionState extends State<DailyEssentialsSection> {
                         child: InkWell(
                           onTap: () {
                             // Add to cart using cart provider
-                            widget.martCartProvider?.addItem(product);
+                            widget.martCartProvider?.addTmartItem(
+                              id: product['_id'] ?? product['id'] ?? '',
+                              name: product['name'] ?? '',
+                              price: (product['price'] ?? 0).toDouble(),
+                              quantity: 1,
+                              image: product['imageUrl'] ?? product['image'] ?? '',
+                              vendorId: product['vendorId'] is String ? product['vendorId'] : product['vendorId']?['_id']?.toString(),
+                            );
                             
                            
                           },
@@ -222,9 +228,9 @@ class _DailyEssentialsSectionState extends State<DailyEssentialsSection> {
                               child: InkWell(
                                 onTap: () {
                                   if (quantity > 1) {
-                                    widget.martCartProvider?.updateQuantity(productId, quantity - 1);
+                                    widget.martCartProvider?.updateQuantity(productId, CartItemType.tmart, quantity - 1);
                                   } else {
-                                    widget.martCartProvider?.removeItem(productId);
+                                    widget.martCartProvider?.removeItem(productId, CartItemType.tmart);
                                   }
                                 },
                                 borderRadius: BorderRadius.circular(16),
@@ -256,7 +262,7 @@ class _DailyEssentialsSectionState extends State<DailyEssentialsSection> {
                               color: Colors.transparent,
                               child: InkWell(
                                 onTap: () {
-                                  widget.martCartProvider?.updateQuantity(productId, quantity + 1);
+                                  widget.martCartProvider?.updateQuantity(productId, CartItemType.tmart, quantity + 1);
                                 },
                                 borderRadius: BorderRadius.circular(16),
                                 child: const SizedBox(
@@ -393,7 +399,7 @@ class _DailyEssentialsSectionState extends State<DailyEssentialsSection> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Daily Essentials',
+                'Fast Delivery Essentials',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

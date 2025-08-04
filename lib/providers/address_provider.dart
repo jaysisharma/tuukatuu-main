@@ -15,10 +15,17 @@ class AddressProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasAddresses => _addresses.isNotEmpty;
+  bool get isAuthenticated => _jwtToken != null && _jwtToken!.isNotEmpty;
 
   // Initialize with token
   void initialize(String token) {
+    if (token.isEmpty) {
+      _setError('Invalid authentication token.');
+      return;
+    }
+    
     _jwtToken = token;
+    _clearError(); // Clear any previous errors
     fetchAddresses();
   }
 
@@ -33,29 +40,61 @@ class AddressProvider with ChangeNotifier {
 
   // Fetch all addresses
   Future<void> fetchAddresses() async {
-    if (_jwtToken == null) return;
+    print('🔍 AddressProvider: Starting fetchAddresses...');
+    print('🔍 AddressProvider: JWT Token available: ${_jwtToken != null}');
+    
+    if (_jwtToken == null) {
+      print('❌ AddressProvider: No JWT token available');
+      _setError('Not authenticated. Please login again.');
+      return;
+    }
 
     _setLoading(true);
+    _clearError(); // Clear any previous errors
+    
     try {
+      print('🔍 AddressProvider: Calling ApiService.getAddresses...');
       final addresses = await ApiService.getAddresses(_jwtToken!);
+      print('🔍 AddressProvider: Received ${addresses.length} addresses from API');
+      
       _addresses = addresses;
-      _defaultAddress = addresses.firstWhere((addr) => addr.isDefault, orElse: () => addresses.first);
+      
+      // Set default address if available
+      if (addresses.isNotEmpty) {
+        _defaultAddress = addresses.firstWhere((addr) => addr.isDefault, orElse: () => addresses.first);
+        print('🔍 AddressProvider: Set default address: ${_defaultAddress?.label}');
+      } else {
+        _defaultAddress = null;
+        print('🔍 AddressProvider: No addresses found, default address set to null');
+      }
+      
       _clearError();
+      print('🔍 AddressProvider: Successfully loaded ${_addresses.length} addresses');
     } catch (e) {
-      _setError('Failed to fetch addresses: $e');
+      print('❌ AddressProvider: Error fetching addresses: $e');
+      if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
+        _setError('Authentication failed. Please login again.');
+      } else if (e.toString().contains('Network') || e.toString().contains('Connection')) {
+        _setError('Network error. Please check your internet connection.');
+      } else {
+        _setError('Failed to fetch addresses. Please try again.');
+      }
     } finally {
       _setLoading(false);
+      print('🔍 AddressProvider: Fetch completed, loading: $_isLoading');
     }
   }
 
   // Create new address
   Future<Address?> createAddress(Map<String, dynamic> addressData) async {
     if (_jwtToken == null) {
-      _setError('Not authenticated');
+      _setError('Not authenticated. Please login again.');
       return null;
     }
 
     _setLoading(true);
+    _clearError();
+    
     try {
       final newAddress = await ApiService.createAddress(_jwtToken!, addressData);
       _addresses.add(newAddress);
@@ -69,11 +108,28 @@ class AddressProvider with ChangeNotifier {
       notifyListeners();
       return newAddress;
     } catch (e) {
-      _setError('Failed to create address: $e');
+      print('❌ Error creating address: $e');
+      if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
+        _setError('Authentication failed. Please login again.');
+      } else if (e.toString().contains('Network') || e.toString().contains('Connection')) {
+        _setError('Network error. Please check your internet connection.');
+      } else {
+        _setError('Failed to create address. Please try again.');
+      }
       return null;
     } finally {
       _setLoading(false);
     }
+  }
+
+  // Retry fetching addresses
+  Future<void> retryFetchAddresses() async {
+    if (!isAuthenticated) {
+      _setError('Not authenticated. Please login again.');
+      return;
+    }
+    
+    await fetchAddresses();
   }
 
   // Update address

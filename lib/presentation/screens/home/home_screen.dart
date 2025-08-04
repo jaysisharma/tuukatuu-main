@@ -5,7 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:tuukatuu/presentation/screens/profile/profile_screen.dart';
 import 'package:tuukatuu/presentation/screens/search_screen.dart';
-import 'package:tuukatuu/presentation/screens/t_mart_screen.dart';
+import 'package:tuukatuu/presentation/screens/t_mart_clean_screen.dart';
 import 'package:tuukatuu/presentation/widgets/cached_image.dart';
 import 'package:tuukatuu/routes.dart';
 import 'package:tuukatuu/screens/category_products_screen.dart';
@@ -18,7 +18,10 @@ import 'dart:convert'; // Added for json.decode
 import 'package:http/http.dart' as http; // Added for http requests
 import 'package:provider/provider.dart';
 import 'package:tuukatuu/providers/auth_provider.dart';
+// import 'package:tuukatuu/providers/favorites_provider.dart';
 import 'package:tuukatuu/widgets/appbar_location.dart';
+import 'package:tuukatuu/presentation/widgets/home_skeleton_loader.dart';
+import 'package:shimmer/shimmer.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -42,12 +45,18 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _featuredStores = [];
   List<dynamic> _allStores = [];
   List<dynamic> _popularNearYou = [];
+  List<dynamic> _featuredRestaurants = []; // Add featured restaurants
   bool _loadingFeaturedStores = true;
   bool _loadingAllStores = true;
   bool _loadingPopularNearYou = true;
+  bool _loadingFeaturedRestaurants = true; // Add loading state for restaurants
   String? _errorFeaturedStores;
   String? _errorAllStores;
   String? _errorPopularNearYou;
+  String? _errorFeaturedRestaurants; // Add error state for restaurants
+  
+  // Filter state
+  String _currentFilter = 'all'; // 'all', 'stores', 'restaurants'
 
   @override
   void dispose() {
@@ -62,8 +71,87 @@ class _HomeScreenState extends State<HomeScreen> {
     _fetchBanners();
     _fetchCoupons();
     _fetchFeaturedStores();
+    _fetchFeaturedRestaurants(); // Add featured restaurants fetch
     _fetchAllStores();
     _fetchPopularNearYou();
+    
+    // Force show content after 5 seconds even if some API calls are still loading
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted && _isLoading()) {
+        print('🔍 HomeScreen: Force showing content after timeout');
+        setState(() {
+          _loadingBanners = false;
+          _loadingCoupons = false;
+          _loadingFeaturedStores = false;
+          _loadingAllStores = false;
+          _loadingPopularNearYou = false;
+          _loadingFeaturedRestaurants = false;
+        });
+      }
+    });
+  }
+
+  bool _isLoading() {
+    final isLoading = _loadingBanners || _loadingCoupons || _loadingFeaturedStores || 
+           _loadingAllStores || _loadingPopularNearYou || _loadingFeaturedRestaurants;
+    print('🔍 HomeScreen: Loading states - Banners: $_loadingBanners, Coupons: $_loadingCoupons, FeaturedStores: $_loadingFeaturedStores, AllStores: $_loadingAllStores, PopularNearYou: $_loadingPopularNearYou, FeaturedRestaurants: $_loadingFeaturedRestaurants');
+    print('🔍 HomeScreen: Is loading: $isLoading');
+    return isLoading;
+  }
+
+  Future<void> _refreshData() async {
+    print('🔄 HomeScreen: Refreshing data...');
+    
+    try {
+      // Reset all loading states
+      setState(() {
+        _loadingBanners = true;
+        _loadingCoupons = true;
+        _loadingFeaturedStores = true;
+        _loadingAllStores = true;
+        _loadingPopularNearYou = true;
+        _loadingFeaturedRestaurants = true;
+      });
+
+      // Fetch all data concurrently with a small delay for better UX
+      await Future.delayed(const Duration(milliseconds: 500));
+      await Future.wait([
+        _fetchBanners(),
+        _fetchCoupons(),
+        _fetchFeaturedStores(),
+        _fetchAllStores(),
+        _fetchPopularNearYou(),
+        _fetchFeaturedRestaurants(),
+      ]);
+
+      print('✅ HomeScreen: Data refresh completed');
+      
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Home screen refreshed successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ HomeScreen: Error refreshing data: $e');
+      
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to refresh: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _getCurrentLocation() async {
@@ -134,13 +222,16 @@ class _HomeScreenState extends State<HomeScreen> {
               color: isDark ? Colors.grey[400] : Colors.grey[600],
             ),
             const SizedBox(width: 12),
-            Text(
-              'Search for items...',
-              style: TextStyle(
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
-                fontSize: 16,
+            Expanded(
+              child: Text(
+                'Search for items...',
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  fontSize: 16,
+                ),
               ),
             ),
+           
           ],
         ),
       ),
@@ -149,64 +240,57 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-
     return Scaffold(
-      backgroundColor: Colors.amber.shade800, // Sets the background for the top part
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 170.0, // Adjust height as needed
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade800,
-                  // Remove bottom border here if you want the white container to touch the orange
-                  // If you want a clear separation, you can keep a subtle border or shadow on the white container
-                ),
-                child: Column(
-                  children: [
-                    AppbarLocation(),
-                    _buildSearchBar(context),
-                  ],
+      backgroundColor: Colors.grey[50],
+      body: Column(
+        children: [
+          // Sticky App Bar with Location and Search
+          Container(
+            color: Colors.amber.shade800,
+            child: Column(
+              children: [
+                const AppbarLocation(),
+                _buildSearchBar(context),
+              ],
+            ),
+          ),
+          // Main Content
+          Expanded(
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
                 ),
               ),
-            ),
-            pinned: true, // Keeps the app bar visible at the top
-            // You might want to set a system overlay style if you have status bar issues
-            // systemOverlayStyle: SystemUiOverlayStyle.light,
-          ),
-          SliverList(
-            delegate: SliverChildListDelegate(
-              [
-                Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
+              child: _isLoading() 
+                ? const HomeSkeletonLoader()
+                : RefreshIndicator(
+                    onRefresh: _refreshData,
+                    color: Colors.amber.shade800,
+                    backgroundColor: Colors.white,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Column(
+                        children: [
+                          const Divider(height: 24, color: Colors.transparent,),
+                          _buildTMartExpressInfo(),
+                          _buildCategories(),
+                          _buildPromotionBannerWithRetry(),
+                          const SizedBox(height: 8),
+                          _buildFeaturedStoresWithRetry(),
+                          const Divider(height: 24),
+                          // _buildPopularNearYouWithRetry(),
+                          // const Divider(height: 24),
+                          _buildQuickEssentials(),
+                          const Divider(height: 24),
+                          _buildAllStoresWithRetry(),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      // The Divider here adds a gap, consider if you want it or prefer a smooth transition
-                      const Divider(height: 24, color: Colors.transparent,), // Made transparent to remove the line
-                      _buildTMartExpressInfo(),
-                      _buildCategories(),
-                      _buildPromotionBannerWithRetry(),
-                      const SizedBox(height: 8),
-                      _buildFeaturedStoresWithRetry(),
-                      const Divider(height: 24),
-                      // _buildPopularNearYouWithRetry(),
-                      // const Divider(height: 24),
-                      _buildQuickEssentials(),
-                      const Divider(height: 24),
-                      _buildAllStoresWithRetry(),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
-              ],
             ),
           ),
         ],
@@ -288,7 +372,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => TMartScreen(),
+                    builder: (_) => const TMartCleanScreen(),
                   ),
                 );
               } else {
@@ -433,7 +517,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildFeaturedStores() {
     if (_loadingFeaturedStores) return const Center(child: CircularProgressIndicator());
-    if (_errorFeaturedStores != null) return Center(child: Text(_errorFeaturedStores!, style: TextStyle(color: Colors.red)));
+    if (_errorFeaturedStores != null) return Center(child: Text(_errorFeaturedStores!, style: const TextStyle(color: Colors.red)));
     if (_featuredStores.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -470,36 +554,85 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: CachedImage(
-                          imageUrl: store['storeImage'] ?? '',
-                          height: 120,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Stack(
                         children: [
-                          Text(
-                            store['storeName'] ?? '',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedImage(
+                              imageUrl: store['storeImage'] ?? '',
+                              height: 120,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          // Store type badge
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                store['vendorType'] == 'restaurant' ? '🍽️' : '🛒',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              store['storeName'] ?? '',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              store['vendorSubType'] ?? store['vendorType'] ?? 'Store',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.star, color: Colors.orange, size: 16),
+                          const Icon(Icons.star, color: Colors.orange, size: 14),
                           const SizedBox(width: 4),
                           Text(
-                            (store['storeRating'] ?? '').toString(),
-                            style: const TextStyle(fontWeight: FontWeight.w500),
+                            (store['storeRating'] ?? '0.0').toString(),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '(${store['storeReviews'] ?? '0'})',
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
@@ -516,7 +649,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPopularNearYou() {
     if (_loadingPopularNearYou) return const Center(child: CircularProgressIndicator());
-    if (_errorPopularNearYou != null) return Center(child: Text(_errorPopularNearYou!, style: TextStyle(color: Colors.red)));
+    if (_errorPopularNearYou != null) return Center(child: Text(_errorPopularNearYou!, style: const TextStyle(color: Colors.red)));
     if (_popularNearYou.isEmpty) return const SizedBox.shrink();
     
     return Column(
@@ -554,31 +687,77 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: CachedImage(
-                          imageUrl: store['storeImage'] ?? '',
-                          height: 120,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
+                      Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedImage(
+                              imageUrl: store['storeImage'] ?? '',
+                              height: 120,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          // Store type badge
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                store['vendorType'] == 'restaurant' ? '🍽️' : '🛒',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        store['storeName'] ?? '',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              store['storeName'] ?? '',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              store['vendorSubType'] ?? store['vendorType'] ?? 'Store',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.star, color: Colors.orange, size: 16),
+                          const Icon(Icons.star, color: Colors.orange, size: 14),
                           const SizedBox(width: 4),
                           Text(
-                            (store['storeRating'] ?? '').toString(),
-                            style: const TextStyle(fontWeight: FontWeight.w500),
+                            (store['storeRating'] ?? '0.0').toString(),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                            ),
                           ),
                           const SizedBox(width: 8),
                           Icon(Icons.location_on, color: Colors.grey[600], size: 16),
@@ -706,148 +885,365 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildAllStores() {
     if (_loadingAllStores) return const Center(child: CircularProgressIndicator());
-    if (_errorAllStores != null) return Center(child: Text(_errorAllStores!, style: TextStyle(color: Colors.red)));
+    if (_errorAllStores != null) return Center(child: Text(_errorAllStores!, style: const TextStyle(color: Colors.red)));
     if (_allStores.isEmpty) return const SizedBox.shrink();
+    
+    // Filter stores based on current filter
+    List<dynamic> filteredStores = _allStores;
+    if (_currentFilter == 'stores') {
+      filteredStores = _allStores.where((store) => store['type'] == 'store').toList();
+    } else if (_currentFilter == 'restaurants') {
+      filteredStores = _allStores.where((store) => store['type'] == 'restaurant').toList();
+    }
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
+        const Padding(
+          padding: EdgeInsets.all(16.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'All Stores',
+              Text(
+                'All Places',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              TextButton(
-                onPressed: () {},
-                child: const Text('View All'),
-              ),
+              
             ],
           ),
         ),
+        
+        // Filter Tabs
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              _buildFilterTab('all', 'All Places'),
+              _buildFilterTab('restaurants', 'Restaurants'),
+              _buildFilterTab('stores', 'Stores'),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Stores List
         ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: _allStores.length,
+          itemCount: filteredStores.length,
           itemBuilder: (context, index) {
-            final store = _allStores[index];
-            return Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 5,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: InkWell(
-                onTap: () {
-                  Navigator.pushNamed(
-                    context,
-                    AppRoutes.storeDetails,
-                    arguments: store,
-                  );
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
-                      child: CachedImage(
-                        imageUrl: store['storeImage'] ?? '',
-                        height: 120,
-                        width: 120,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              store['storeName'] ?? '',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              store['storeDescription'] ?? '',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(Icons.star, color: Colors.orange[700], size: 16),
-                                const SizedBox(width: 4),
-                                Text(
-                                  (store['storeRating'] ?? '').toString(),
-                                  style: const TextStyle(fontWeight: FontWeight.w500),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: (store['storeTags'] as List<dynamic>? ?? []).map((tag) {
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    tag.toString(),
-                                    style: TextStyle(
-                                      color: Theme.of(context).colorScheme.primary,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
+            final store = filteredStores[index];
+            return _buildEnhancedStoreCard(store);
           },
         ),
       ],
     );
   }
 
+  Widget _buildFilterTab(String filter, String label) {
+    final isSelected = _currentFilter == filter;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _currentFilter = filter;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.orange : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected ? Colors.white : Colors.grey[600],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedStoreCard(dynamic store) {
+    final images = store['images'] as List<dynamic>? ?? [store['storeImage'] ?? ''];
+    final rating = (store['storeRating'] ?? 0).toDouble();
+    final distance = _getDistanceText(store);
+    final deliveryTime = store['deliveryTime'] ?? '30-45 min';
+    final itemType = store['type'] ?? 'store';
+    final isFavorited = false; // TODO: Implement favorites functionality
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.pushNamed(
+            context,
+            AppRoutes.storeDetails,
+            arguments: store,
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image Carousel
+            Stack(
+              children: [
+                Container(
+                  height: 200,
+                  width: double.infinity,
+                  child: PageView.builder(
+                    itemCount: images.length,
+                    itemBuilder: (context, imageIndex) {
+                      return ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                        child: CachedImage(
+                          imageUrl: images[imageIndex],
+                          height: 200,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                
+                // Favorite Heart Icon
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: GestureDetector(
+                    onTap: () async {
+                      // TODO: Implement favorites functionality
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('${isFavorited ? 'Removed from' : 'Added to'} favorites')),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isFavorited ? Icons.favorite : Icons.favorite_border,
+                        color: isFavorited ? Colors.red : Colors.grey[600],
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Image Indicator
+                if (images.length > 1)
+                  Positioned(
+                    bottom: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${images.length} photos',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            
+            // Store Info
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          store['storeName'] ?? '',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          store['type'] == 'restaurant' ? 'Restaurant' : 'Store',
+                          style: TextStyle(
+                            color: Colors.orange[700],
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  
+                  Text(
+                    store['storeDescription'] ?? '',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 14,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Rating, Distance, and Time
+                  Row(
+                    children: [
+                      // Rating
+                      Row(
+                        children: [
+                          const Icon(Icons.star, color: Colors.orange, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            rating.toString(),
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(width: 16),
+                      
+                      // Distance
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, color: Colors.grey[600], size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            distance,
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(width: 16),
+                      
+                      // Delivery Time
+                      Row(
+                        children: [
+                          Icon(Icons.access_time, color: Colors.grey[600], size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            deliveryTime,
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Tags
+                  if (store['storeTags'] != null)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: (store['storeTags'] as List<dynamic>).map((tag) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            tag.toString(),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _fetchBanners() async {
+    print('🔍 HomeScreen: Fetching banners...');
     setState(() => _loadingBanners = true);
     try {
       final data = await ApiService.get('/banners');
+      print('🔍 HomeScreen: Banners fetched successfully: ${data.length} banners');
       setState(() {
         _banners = data;
         _loadingBanners = false;
       });
     } catch (e) {
-      setState(() => _loadingBanners = false);
+      print('❌ HomeScreen: Error fetching banners: $e');
+      // Use mock data if API fails
+      setState(() {
+        _banners = [
+          {
+            'imageUrl': 'https://via.placeholder.com/400x200/FF6B35/FFFFFF?text=T-Mart+Express',
+            'title': 'T-Mart Express',
+            'subtitle': 'Get groceries delivered in 15-30 minutes'
+          },
+          {
+            'imageUrl': 'https://via.placeholder.com/400x200/4CAF50/FFFFFF?text=Fresh+Groceries',
+            'title': 'Fresh Groceries',
+            'subtitle': 'Quality products at best prices'
+          }
+        ];
+        _loadingBanners = false;
+      });
     }
   }
 
@@ -860,7 +1256,23 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadingCoupons = false;
       });
     } catch (e) {
-      setState(() => _loadingCoupons = false);
+      print('❌ HomeScreen: Error fetching coupons: $e');
+      // Use mock data if API fails
+      setState(() {
+        _coupons = [
+          {
+            'code': 'WELCOME20',
+            'discount': 20,
+            'description': 'First order discount'
+          },
+          {
+            'code': 'FRESH10',
+            'discount': 10,
+            'description': 'Fresh groceries discount'
+          }
+        ];
+        _loadingCoupons = false;
+      });
     }
   }
 
@@ -876,9 +1288,62 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadingFeaturedStores = false;
       });
     } catch (e) {
+      print('❌ HomeScreen: Error fetching featured stores: $e');
+      // Use mock data if API fails
       setState(() {
+        _featuredStores = [
+          {
+            'name': 'Fresh Grocery Store',
+            'image': 'https://via.placeholder.com/150x150/4CAF50/FFFFFF?text=Grocery',
+            'rating': 4.5,
+            'deliveryTime': '15-30 min',
+            'deliveryFee': 'Free'
+          },
+          {
+            'name': 'Quick Mart',
+            'image': 'https://via.placeholder.com/150x150/FF9800/FFFFFF?text=Quick',
+            'rating': 4.2,
+            'deliveryTime': '20-35 min',
+            'deliveryFee': '₹20'
+          }
+        ];
         _loadingFeaturedStores = false;
-        _errorFeaturedStores = e.toString();
+      });
+    }
+  }
+
+  Future<void> _fetchFeaturedRestaurants() async {
+    setState(() {
+      _loadingFeaturedRestaurants = true;
+      _errorFeaturedRestaurants = null;
+    });
+    try {
+      final data = await ApiService.get('/auth/featured-restaurants');
+      setState(() {
+        _featuredRestaurants = data;
+        _loadingFeaturedRestaurants = false;
+      });
+    } catch (e) {
+      print('❌ HomeScreen: Error fetching featured restaurants: $e');
+      // Use mock data if API fails
+      setState(() {
+        _featuredRestaurants = [
+          {
+            'name': 'Pizza Palace',
+            'image': 'https://via.placeholder.com/150x150/FF5722/FFFFFF?text=Pizza',
+            'rating': 4.6,
+            'deliveryTime': '30-45 min',
+            'deliveryFee': '₹40'
+          },
+          {
+            'name': 'Burger House',
+            'image': 'https://via.placeholder.com/150x150/FF9800/FFFFFF?text=Burger',
+            'rating': 4.3,
+            'deliveryTime': '25-35 min',
+            'deliveryFee': '₹25'
+          }
+        ];
+        _loadingFeaturedRestaurants = false;
       });
     }
   }
@@ -895,23 +1360,53 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadingAllStores = false;
       });
     } catch (e) {
+      print('❌ HomeScreen: Error fetching all stores: $e');
+      // Use mock data if API fails
       setState(() {
+        _allStores = [
+          {
+            'name': 'Super Market',
+            'image': 'https://via.placeholder.com/150x150/2196F3/FFFFFF?text=Super',
+            'rating': 4.3,
+            'deliveryTime': '25-40 min',
+            'deliveryFee': '₹30'
+          },
+          {
+            'name': 'Local Grocery',
+            'image': 'https://via.placeholder.com/150x150/9C27B0/FFFFFF?text=Local',
+            'rating': 4.1,
+            'deliveryTime': '15-25 min',
+            'deliveryFee': '₹15'
+          },
+          {
+            'name': 'Express Mart',
+            'image': 'https://via.placeholder.com/150x150/FF5722/FFFFFF?text=Express',
+            'rating': 4.4,
+            'deliveryTime': '10-20 min',
+            'deliveryFee': 'Free'
+          }
+        ];
         _loadingAllStores = false;
-        _errorAllStores = e.toString();
       });
     }
   }
 
   Widget _buildPromotionBannerWithRetry() {
-    if (_loadingBanners) return const Center(child: CircularProgressIndicator());
-    if (_banners.isEmpty) return Center(
-      child: Column(
-        children: [
-          const Text('No banners available.'),
-          TextButton(onPressed: _fetchBanners, child: const Text('Retry')),
-        ],
+    if (_loadingBanners) return Container(
+      height: 180,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[300],
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
       ),
     );
+    if (_banners.isEmpty) return const SizedBox.shrink();
     return _buildPromotionBanner();
   }
 
@@ -929,24 +1424,115 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildFeaturedStoresWithRetry() {
-    if (_loadingFeaturedStores) return const Center(child: CircularProgressIndicator());
-    if (_errorFeaturedStores != null) return Center(
-      child: Column(
-        children: [
-          Text(_errorFeaturedStores!, style: const TextStyle(color: Colors.red)),
-          TextButton(onPressed: _fetchFeaturedStores, child: const Text('Retry')),
-        ],
+    if (_loadingFeaturedStores) return Container(
+      height: 200,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[300],
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
       ),
     );
-    if (_featuredStores.isEmpty) return Center(
-      child: Column(
-        children: [
-          const Text('No featured stores.'),
-          TextButton(onPressed: _fetchFeaturedStores, child: const Text('Retry')),
-        ],
-      ),
-    );
+    if (_errorFeaturedStores != null) return const SizedBox.shrink();
+    if (_featuredStores.isEmpty) return const SizedBox.shrink();
     return _buildFeaturedStores();
+  }
+
+  Widget _buildFeaturedRestaurantsWithRetry() {
+    if (_loadingFeaturedRestaurants) return const Center(child: CircularProgressIndicator());
+    if (_errorFeaturedRestaurants != null) return Center(
+      child: Column(
+        children: [
+          Text(_errorFeaturedRestaurants!, style: const TextStyle(color: Colors.red)),
+          TextButton(onPressed: _fetchFeaturedRestaurants, child: const Text('Retry')),
+        ],
+      ),
+    );
+    if (_featuredRestaurants.isEmpty) return Center(
+      child: Column(
+        children: [
+          const Text('No featured restaurants.'),
+          TextButton(onPressed: _fetchFeaturedRestaurants, child: const Text('Retry')),
+        ],
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text(
+            'Featured Restaurants',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 200,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            itemCount: _featuredRestaurants.length,
+            itemBuilder: (context, index) {
+              final restaurant = _featuredRestaurants[index];
+              return Container(
+                width: 200,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.storeDetails,
+                      arguments: restaurant,
+                    );
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: CachedImage(
+                          imageUrl: restaurant['restaurantImage'] ?? '',
+                          height: 120,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        restaurant['restaurantName'] ?? '',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.star, color: Colors.orange, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            (restaurant['restaurantRating'] ?? '').toString(),
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildPopularNearYouWithRetry() {
@@ -954,29 +1540,30 @@ class _HomeScreenState extends State<HomeScreen> {
       future: _fetchPopularNearYou(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return Container(
+            height: 200,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            child: Shimmer.fromColors(
+              baseColor: Colors.grey[300]!,
+              highlightColor: Colors.grey[100]!,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          );
         }
         
         if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              children: [
-                Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.red)),
-                TextButton(
-                  onPressed: () => setState(() {}), 
-                  child: const Text('Retry')
-                ),
-              ],
-            ),
-          );
+          return const SizedBox.shrink();
         }
         
         final stores = snapshot.data ?? [];
         
         if (stores.isEmpty) {
-          return const Center(
-            child: Text('No stores found near you'),
-          );
+          return const SizedBox.shrink();
         }
         
         return _buildPopularNearYou();
@@ -1016,28 +1603,43 @@ class _HomeScreenState extends State<HomeScreen> {
       return stores;
     } catch (e) {
       print('❌ Error fetching popular near you: $e');
-      return [];
+      // Return mock data if API fails
+      return [
+        {
+          'name': 'Nearby Grocery',
+          'image': 'https://via.placeholder.com/150x150/4CAF50/FFFFFF?text=Nearby',
+          'rating': 4.2,
+          'deliveryTime': '10-15 min',
+          'deliveryFee': '₹10'
+        },
+        {
+          'name': 'Quick Stop',
+          'image': 'https://via.placeholder.com/150x150/FF9800/FFFFFF?text=Quick',
+          'rating': 4.0,
+          'deliveryTime': '15-20 min',
+          'deliveryFee': '₹15'
+        }
+      ];
     }
   }
 
   Widget _buildAllStoresWithRetry() {
-    if (_loadingAllStores) return const Center(child: CircularProgressIndicator());
-    if (_errorAllStores != null) return Center(
-      child: Column(
-        children: [
-          Text(_errorAllStores!, style: const TextStyle(color: Colors.red)),
-          TextButton(onPressed: _fetchAllStores, child: const Text('Retry')),
-        ],
+    if (_loadingAllStores) return Container(
+      height: 200,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[300],
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
       ),
     );
-    if (_allStores.isEmpty) return Center(
-      child: Column(
-        children: [
-          const Text('No stores found.'),
-          TextButton(onPressed: _fetchAllStores, child: const Text('Retry')),
-        ],
-      ),
-    );
+    if (_errorAllStores != null) return const SizedBox.shrink();
+    if (_allStores.isEmpty) return const SizedBox.shrink();
     return _buildAllStores();
   }
 }

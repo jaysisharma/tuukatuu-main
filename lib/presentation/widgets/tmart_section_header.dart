@@ -31,7 +31,7 @@ class TMartSectionHeader extends StatelessWidget {
             Text(
               title,
               style: GoogleFonts.poppins(
-                fontSize: 20,
+                fontSize: 16, // Reduced from 20 to 16
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
               ),
@@ -41,9 +41,10 @@ class TMartSectionHeader extends StatelessWidget {
         if (onViewAll != null)
           TextButton(
             onPressed: onViewAll,
-            child: Text(
+            child:             Text(
               'View All',
               style: GoogleFonts.poppins(
+                fontSize: 12, // Reduced font size
                 color: const Color(0xFFFC8019), // Swiggy Orange
                 fontWeight: FontWeight.w600,
               ),

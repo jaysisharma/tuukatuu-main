@@ -14,5 +14,6 @@ router.use('/admin/featured-products', require('./adminFeaturedProducts'));
 router.use('/riders', require('./riders'));
 router.use('/categories', require('./categories'));
 router.use('/daily-essentials', require('./dailyEssentials'));
+router.use('/', require('./todayDeals'));
 
 module.exports = router; 

@@ -20,6 +20,17 @@ const userSchema = new mongoose.Schema({
   storeBanner: { type: String },
   storeTags: [{ type: String }],
   storeCategories: [{ type: String }], // Primary categories the store belongs to
+  // Vendor type and subtype for better categorization
+  vendorType: {
+    type: String,
+    enum: ['restaurant', 'store'],
+    default: 'store'
+  },
+  vendorSubType: {
+    type: String,
+    // For restaurants: chinese, italian, indian, nepali, fast_food, fine_dining, etc.
+    // For stores: grocery, pharmacy, electronics, clothing, convenience, etc.
+  },
   storeRating: { type: Number, default: 0 },
   storeReviews: { type: Number, default: 0 },
   isFeatured: { type: Boolean, default: false },

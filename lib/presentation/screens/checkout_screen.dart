@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../models/product.dart';
 import '../../models/address.dart';
 import 'package:provider/provider.dart';
 import '../../providers/address_provider.dart';
@@ -7,9 +6,9 @@ import '../../providers/cart_provider.dart';
 import '../../providers/mart_cart_provider.dart';
 import 'order_placed_screen.dart';
 import '../../providers/auth_provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../widgets/cached_image.dart';
 import '../../services/api_service.dart';
+import '../../services/error_service.dart';
 import '../screens/location/location_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -142,7 +141,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   double _getSelectedTip() {
     if (_isCustomTip) {
-      return double.tryParse(_customTipController.text) ?? 0.0;
+      final customAmount = double.tryParse(_customTipController.text) ?? 0.0;
+      // Limit custom tip to 1000 rupees
+      return customAmount > 1000 ? 1000.0 : customAmount;
     }
     return _tipOptions[_selectedTipIndex].toDouble();
   }
@@ -224,6 +225,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          icon: const Icon(Icons.arrow_back),
+        ),
         title: Text(
           widget.isTmartOrder ? 'T-Mart Checkout' : 'Checkout',
           style: const TextStyle(
@@ -234,46 +241,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ),
       body: Column(
         children: [
-          // T-Mart Order Indicator
-          if (widget.isTmartOrder)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: const Color(0xFFFC8019).withOpacity(0.1),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.local_grocery_store,
-                    color: const Color(0xFFFC8019),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'T-Mart Order - High Priority',
-                    style: TextStyle(
-                      color: const Color(0xFFFC8019),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFC8019),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      '20 min',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+
           
           // Dynamic Progress Indicator
           Container(
@@ -386,12 +354,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       });
                                     }
                                   } catch (e) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Error adding location: $e'),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
+                                    // Silent error handling
                                   }
                                 },
                                 icon: const Icon(Icons.add_location),
@@ -431,70 +394,68 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
                         ..._tipOptions.asMap().entries.map((entry) {
                           final index = entry.key;
                           final amount = entry.value;
                           final isSelected = !_isCustomTip && index == _selectedTipIndex;
-                          return Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _isCustomTip = false;
-                                  _selectedTipIndex = index;
-                                });
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.symmetric(horizontal: 4),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).cardColor,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? Theme.of(context).colorScheme.primary
-                                        : (Theme.of(context).brightness == Brightness.dark ? Colors.grey[800]! : Colors.grey[300]!),
-                                  ),
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isCustomTip = false;
+                                _selectedTipIndex = index;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).cardColor,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Theme.of(context).colorScheme.primary
+                                      : (Theme.of(context).brightness == Brightness.dark ? Colors.grey[800]! : Colors.grey[300]!),
                                 ),
-                                child: Text(
-                                  'Rs $amount',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: isSelected ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                              ),
+                              child: Text(
+                                'Rs $amount',
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
                           );
                         }),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _isCustomTip = true;
-                              });
-                            },
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                color: _isCustomTip ? Theme.of(context).colorScheme.primary : Theme.of(context).cardColor,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: _isCustomTip
-                                      ? Theme.of(context).colorScheme.primary
-                                      : (Theme.of(context).brightness == Brightness.dark ? Colors.grey[800]! : Colors.grey[300]!),
-                                ),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _isCustomTip = true;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _isCustomTip ? Theme.of(context).colorScheme.primary : Theme.of(context).cardColor,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _isCustomTip
+                                    ? Theme.of(context).colorScheme.primary
+                                    : (Theme.of(context).brightness == Brightness.dark ? Colors.grey[800]! : Colors.grey[300]!),
                               ),
-                              child: _isCustomTip
-                                  ? TextField(
+                            ),
+                            child: _isCustomTip
+                                ? SizedBox(
+                                    width: 80,
+                                    child: TextField(
                                       controller: _customTipController,
                                       keyboardType: TextInputType.number,
                                       textAlign: TextAlign.center,
                                       style: const TextStyle(
-                                        color: Colors.black,
+                                        color: Colors.white,
                                         fontWeight: FontWeight.w600,
                                       ),
                                       decoration: const InputDecoration(
@@ -506,30 +467,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                         contentPadding: EdgeInsets.zero,
                                       ),
                                       onChanged: (value) {
+                                        // Validate custom tip amount
+                                        final amount = double.tryParse(value);
+                                        if (amount != null && amount > 1000) {
+                                          _customTipController.text = '1000';
+                                          _customTipController.selection = TextSelection.fromPosition(
+                                            TextPosition(offset: _customTipController.text.length),
+                                          );
+                                        }
                                         setState(() {});
                                       },
-                                    )
-                                  : Text(
-                                      'Custom',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: _isCustomTip ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color,
-                                        fontWeight: FontWeight.w600,
-                                      ),
                                     ),
-                            ),
+                                  )
+                                : const Text(
+                                    'Custom',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                           ),
                         ),
                       ],
                     ),
-                    if (_isCustomTip)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6, left: 4),
-                        child: Text(
-                          'Enter your own tip amount',
-                          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary),
+                                          if (_isCustomTip)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6, left: 4),
+                          child: Text(
+                            'Enter your own tip amount (max Rs 1000)',
+                            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary),
+                          ),
                         ),
-                      ),
                     // Summary Section
                     Container(
                       key: _summarySectionKey,
@@ -622,25 +590,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             final authProvider = Provider.of<AuthProvider>(context, listen: false);
                             final addresses = addressProvider.addresses;
                             if (addresses.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Please add a delivery address.')),
-                              );
                               return;
                             }
                             final selectedAddress = addresses[_selectedAddressIndex];
                             
                             // Use the appropriate cart provider based on order type
-                            String? vendorId;
                             dynamic cartProvider;
                             if (widget.isTmartOrder || 
                                 (widget.cartItems.isNotEmpty && widget.cartItems.first['orderType'] == 'tmart')) {
                               cartProvider = Provider.of<MartCartProvider>(context, listen: false);
-                              vendorId = cartProvider.vendorId;
-                              print("T-Mart Vendor ID: $vendorId");
                             } else {
                               cartProvider = Provider.of<CartProvider>(context, listen: false);
+                            }
+                            
+                            // Get vendorId from cart items instead of cart provider
+                            String? vendorId;
+                            if (widget.cartItems.isNotEmpty) {
+                              final firstItem = widget.cartItems.first;
+                              vendorId = firstItem['vendorId']?.toString();
+                              print("Vendor ID from cart items: $vendorId");
+                            }
+                            
+                            // Fallback to cart provider vendorId if not found in cart items
+                            if (vendorId == null || vendorId.isEmpty) {
                               vendorId = cartProvider.vendorId;
-                              print("Regular Vendor ID: $vendorId");
+                              print("Fallback Vendor ID from cart provider: $vendorId");
                             }
                             final items = widget.cartItems.map((item) => {
                               'product': item['id'],
@@ -655,38 +629,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             
                             // Check if address has valid coordinates
                             if (selectedAddress.latitude == 0 && selectedAddress.longitude == 0) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Selected address is missing coordinates. Please select a valid address.'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
                               return;
                             }
 
                             // Validate coordinates are within reasonable bounds
                             if (selectedAddress.latitude < -90 || selectedAddress.latitude > 90 ||
                                 selectedAddress.longitude < -180 || selectedAddress.longitude > 180) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Invalid coordinates. Please select a valid address.'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
                               return;
                             }
 
                             // Determine if this is a T-Mart order
                             final isTmartOrder = widget.isTmartOrder || 
                                 (widget.cartItems.isNotEmpty && widget.cartItems.first['orderType'] == 'tmart');
-                            print("Vendor ID: $vendorId");
+                            print("Final Vendor ID: $vendorId");
                             print("Cart items: ${widget.cartItems.length}");
                             if (widget.cartItems.isNotEmpty) {
                               print("First cart item: ${widget.cartItems.first}");
                               print("First cart item vendorId: ${widget.cartItems.first['vendorId']}");
                             }
+                            
+                            // Validate vendorId is not null or empty
+                            if (vendorId == null || vendorId.isEmpty) {
+                              return;
+                            }
+                            print("Order Payload - Vendor ID: $vendorId");
+                            print("Order Payload - Items: $items");
                             final orderPayload = {
-                              'vendorId':  vendorId,
+                              'vendorId': vendorId,
                               'items': items,
                               'itemTotal': itemTotal,
                               'tax': tax,
@@ -716,12 +685,6 @@ print("Place Order Pressed");
                                 body: orderPayload,
                               );
                               cartProvider.clearCart();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Order placed successfully!'),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
@@ -729,12 +692,7 @@ print("Place Order Pressed");
                                 ),
                               );
                             } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Failed to place order: $e'),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
+                              // Silent error handling
                             }
                           },
                           style: ElevatedButton.styleFrom(

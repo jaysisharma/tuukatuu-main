@@ -3,9 +3,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:tuukatuu/presentation/screens/rough_location.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../services/api_service.dart';
+import '../../../services/error_service.dart';
+import '../../../utils/error_handler_mixin.dart';
+import '../../../widgets/error_widget.dart';
 import 'order_tracking.dart';
 import 'order_detail_screen.dart';
 
@@ -16,13 +18,14 @@ class OrderHistoryScreen extends StatefulWidget {
   State<OrderHistoryScreen> createState() => _OrderHistoryScreenState();
 }
 
-class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
+class _OrderHistoryScreenState extends State<OrderHistoryScreen> with ErrorHandlerMixin {
   int _selectedTabIndex = 0;
   String _searchQuery = '';
   String _selectedDateFilter = 'all';
   bool _isLoading = true;
   bool _isRefreshing = false;
   String? _error;
+  String? _errorType;
   List<Map<String, dynamic>> _orders = [];
   List<Map<String, dynamic>> _filteredOrders = [];
 
@@ -52,6 +55,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       setState(() {
         _isLoading = true;
         _error = null;
+        _errorType = null;
       });
     }
 
@@ -59,8 +63,20 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final response = await ApiService.get('/orders/customer/my', token: authProvider.jwtToken);
       
+      // Handle both single order and list of orders
+      List<Map<String, dynamic>> ordersList;
+      if (response is List) {
+        ordersList = List<Map<String, dynamic>>.from(response);
+      } else if (response is Map<String, dynamic>) {
+        // If it's a single order, wrap it in a list
+        ordersList = [response];
+      } else {
+        // If response is null or unexpected type, use empty list
+        ordersList = [];
+      }
+      
       setState(() {
-        _orders = List<Map<String, dynamic>>.from(response);
+        _orders = ordersList;
         _isLoading = false;
         _isRefreshing = false;
       });
@@ -68,10 +84,29 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       _applyFilters();
     } catch (e) {
       setState(() {
-        _error = e.toString();
         _isLoading = false;
         _isRefreshing = false;
       });
+      
+      if (e is ApiException) {
+        setState(() {
+          _error = e.message;
+          _errorType = e.errorType;
+        });
+        
+        // Handle authentication errors specifically
+        if (e.errorType == ErrorService.authenticationError) {
+          handleAuthError(e);
+        } else {
+          handleError(e);
+        }
+      } else {
+        setState(() {
+          _error = 'Failed to load orders';
+          _errorType = ErrorService.unknownError;
+        });
+        handleError(e, customMessage: 'Failed to load orders');
+      }
     }
   }
 
@@ -101,11 +136,16 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       filtered = filtered.where((order) {
         final orderId = order['_id'].toString().toLowerCase();
         final vendorName = (order['vendorId']?['storeName'] ?? '').toLowerCase();
-        final items = (order['items'] as List).map((item) => item['name'].toString().toLowerCase()).join(' ');
+        
+        // Safely handle items list
+        String itemsText = '';
+        if (order['items'] is List) {
+          itemsText = (order['items'] as List).map((item) => item['name']?.toString().toLowerCase() ?? '').join(' ');
+        }
         
         return orderId.contains(_searchQuery.toLowerCase()) ||
                vendorName.contains(_searchQuery.toLowerCase()) ||
-               items.contains(_searchQuery.toLowerCase());
+               itemsText.contains(_searchQuery.toLowerCase());
       }).toList();
     }
 
@@ -306,7 +346,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           // Orders List
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const LoadingWidget(message: 'Loading orders...')
                 : _error != null
                     ? _buildErrorWidget()
                     : _filteredOrders.isEmpty
@@ -391,8 +431,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     final statusColor = _getStatusColor(status);
     final statusIcon = _getStatusIcon(status);
     final orderDate = _formatDate(order['createdAt']);
-    final total = _formatCurrency(order['total'].toDouble());
-    final itemCount = (order['items'] as List).length;
+    final total = _formatCurrency(order['total']?.toDouble() ?? 0.0);
+    final itemCount = order['items'] is List ? (order['items'] as List).length : 0;
     final vendorName = order['vendorId']?['storeName'] ?? 'Unknown Store';
     final orderId = order['_id'].toString().substring(0, 8).toUpperCase();
 
@@ -502,38 +542,52 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        ...(order['items'] as List).take(3).map((item) => Container(
-                          constraints: const BoxConstraints(maxWidth: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${item['name'] ?? 'Unknown Item'} x${item['quantity'] ?? 1}',
-                            style: const TextStyle(fontSize: 12),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        )),
-                        if ((order['items'] as List).length > 3)
-                          Container(
+                    if (order['items'] is List) ...[
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ...(order['items'] as List).take(3).map((item) => Container(
+                            constraints: const BoxConstraints(maxWidth: 200),
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: Colors.grey[100],
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              '+${(order['items'] as List).length - 3} more',
+                              '${item['name'] ?? 'Unknown Item'} x${item['quantity'] ?? 1}',
                               style: const TextStyle(fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
-                          ),
-                      ],
-                    ),
+                          )),
+                          if ((order['items'] as List).length > 3)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '+${(order['items'] as List).length - 3} more',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'No items available',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -722,63 +776,25 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   }
 
   Widget _buildErrorWidget() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            'Something went wrong',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _error ?? 'Unable to load orders',
-            style: TextStyle(
-              color: Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _fetchOrders,
-            child: const Text('Try Again'),
-          ),
-        ],
-      ),
+    if (_errorType != null) {
+      return CustomErrorWidget(
+        errorType: _errorType!,
+        message: _error ?? 'Unable to load orders',
+        onRetry: _fetchOrders,
+      );
+    }
+    
+    return CustomErrorWidget(
+      message: _error ?? 'Unable to load orders',
+      onRetry: _fetchOrders,
     );
   }
 
   Widget _buildEmptyWidget() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            'No orders found',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try adjusting your filters or search terms',
-            style: TextStyle(
-              color: Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+    return EmptyStateWidget(
+      title: 'No orders found',
+      message: 'Try adjusting your filters or search terms',
+      icon: Icons.receipt_long_outlined,
     );
   }
 

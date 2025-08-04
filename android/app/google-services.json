@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "716814795260",
+    "project_id": "tukatuu-5e913",
+    "storage_bucket": "tukatuu-5e913.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:716814795260:android:18603da5e3851780023279",
+        "android_client_info": {
+          "package_name": "com.example.tuukatuu"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBv8Le7FKW_49dtoVKSbokaG3m59nSIxSY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

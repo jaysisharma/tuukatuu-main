@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../core/config/app_config.dart';
 
 class AuthProvider extends ChangeNotifier {
   static const String _isLoggedInKey = 'is_logged_in';
@@ -32,7 +33,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> getProfile() async {
     if (_jwtToken == null) return;
-    final url = Uri.parse('http://localhost:3000/api/auth/me');
+    final url = Uri.parse(AppConfig.profileUrl);
     final response = await http.get(url, headers: {
       'Authorization': 'Bearer $_jwtToken',
     });
@@ -47,7 +48,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> updateProfile({required String name, required String phone}) async {
     if (_jwtToken == null) return;
-    final url = Uri.parse('http://localhost:3000/api/auth/me');
+    final url = Uri.parse(AppConfig.profileUrl);
     final response = await http.put(url, headers: {
       'Authorization': 'Bearer $_jwtToken',
       'Content-Type': 'application/json',
@@ -64,7 +65,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> login({required String email, required String password}) async {
-    final url = Uri.parse('http://localhost:3000/api/auth/login');
+    final url = Uri.parse(AppConfig.loginUrl);
     final response = await http.post(url, body: {
       'email': email,
       'password': password,
@@ -85,7 +86,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> signup({required String name, required String email, required String password, required String phone}) async {
-    final url = Uri.parse('http://localhost:3000/api/auth/register');
+    final url = Uri.parse(AppConfig.registerUrl);
     final response = await http.post(url, body: {
       'name': name,
       'email': email,

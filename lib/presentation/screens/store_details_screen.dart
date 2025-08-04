@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:tuukatuu/presentation/screens/product_details_screen.dart';
 import '../../../core/config/routes.dart';
 import '../../widgets/cached_image.dart';
 import 'package:provider/provider.dart';
 import 'package:tuukatuu/providers/cart_provider.dart';
 import '../../services/api_service.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../models/product.dart';
 
 class StoreDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> store;
@@ -32,6 +34,31 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
   bool _loadingProducts = true;
   String? _errorProducts;
   String _searchQuery = '';
+  
+  // Normalized store data getter
+  Map<String, dynamic> get _normalizedStore {
+    final store = widget.store;
+    return {
+      'name': store['storeName'] ?? store['name'] ?? 'Store',
+      'storeName': store['storeName'] ?? store['name'] ?? 'Store',
+      'description': store['storeDescription'] ?? store['description'] ?? '',
+      'storeDescription': store['storeDescription'] ?? store['description'] ?? '',
+      'image': store['storeImage'] ?? store['image'] ?? '',
+      'storeImage': store['storeImage'] ?? store['image'] ?? '',
+      'banner': store['storeBanner'] ?? store['banner'] ?? store['storeImage'] ?? store['image'] ?? '',
+      'storeBanner': store['storeBanner'] ?? store['banner'] ?? store['storeImage'] ?? store['image'] ?? '',
+      'rating': store['storeRating'] ?? store['rating'] ?? 0.0,
+      'storeRating': store['storeRating'] ?? store['rating'] ?? 0.0,
+      'reviews': store['storeReviews'] ?? store['reviews'] ?? 0,
+      'storeReviews': store['storeReviews'] ?? store['reviews'] ?? 0,
+      'vendorType': store['vendorType'] ?? 'store',
+      'vendorSubType': store['vendorSubType'] ?? '',
+      'id': store['_id'] ?? store['id'],
+      '_id': store['_id'] ?? store['id'],
+      'vendorId': store['_id'] ?? store['vendorId'],
+    };
+  }
+  
   List<dynamic> get _filteredProducts {
     if (_searchQuery.isEmpty) return _products;
     return _products.where((p) => (p['name'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase())).toList();
@@ -96,7 +123,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                       imageUrl: item['imageUrl'] ?? item['image'] ?? '',
                       height: 60,
                       width: 60,
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -179,7 +206,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                       'quantity': quantity,
                       'notes': '',
                       'image': item['imageUrl'] ?? '',
-                      'vendorId': item['vendorId'] ?? widget.store['_id'],
+                      'vendorId': item['vendorId'] ?? _normalizedStore['_id'],
                     });
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -245,13 +272,13 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
         throw Exception('Store data is empty');
       }
       
-      // Use vendorId if present, else fallback to _id
-      final vendorId = widget.store['vendorId'] ?? widget.store['_id'];
+      // Use normalized store data
+      final vendorId = _normalizedStore['vendorId'];
       if (vendorId == null || vendorId.toString().isEmpty) {
         throw Exception('No valid vendor ID found in store data');
       }
       
-      print('🔍 Fetching products for store: ${widget.store['name']} (vendorId: $vendorId)');
+      print('🔍 Fetching products for store: ${_normalizedStore['name']} (vendorId: $vendorId)');
       
       final products = await ApiService.getProductsByVendor(vendorId.toString());
       print('🔍 Received ${products.length} products for store');
@@ -476,7 +503,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
       title: _showSearch
           ? TextField(
               decoration: InputDecoration(
-                hintText: 'Search in ${widget.store['name']}',
+                hintText: 'Search in ${_normalizedStore['name']}',
                 hintStyle: TextStyle(color: Colors.grey[600], fontSize: 16),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
@@ -491,7 +518,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
             )
           : _isCollapsed
               ? Text(
-                  widget.store['name']!,
+                  _normalizedStore['name']!,
                   style: const TextStyle(
                     color: Colors.black,
                     fontSize: 18,
@@ -518,8 +545,8 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
             color: _isCollapsed ? Colors.black : Colors.white,
           ),
           onPressed: () {
-            final storeName = widget.store['name'] ?? '';
-            final storeId = widget.store['_id'] ?? widget.store['vendorId'] ?? '';
+            final storeName = _normalizedStore['name'] ?? '';
+            final storeId = _normalizedStore['_id'] ?? _normalizedStore['vendorId'] ?? '';
             final storeUrl = 'https://tuukatuu.com/store/$storeId';
             Share.share('Check out $storeName on TuukaTuu! $storeUrl');
           },
@@ -531,7 +558,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
           fit: StackFit.expand,
           children: [
             CachedImage(
-              imageUrl: widget.store['storeBanner'] ?? widget.store['storeImage'] ?? '',
+              imageUrl: _normalizedStore['storeBanner'] ?? _normalizedStore['storeImage'] ?? '',
               fit: BoxFit.cover,
             ),
             Container(
@@ -554,7 +581,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    widget.store['name']!,
+                    _normalizedStore['name']!,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 24,
@@ -563,7 +590,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    widget.store['storeDescription'] ?? '',
+                    _normalizedStore['storeDescription'] ?? '',
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.9),
                       fontSize: 14,
@@ -640,7 +667,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                       Icon(Icons.star, color: Colors.green[700], size: 16),
                       const SizedBox(width: 4),
                       Text(
-                        (widget.store['storeRating'] ?? '').toString(),
+                        (_normalizedStore['storeRating'] ?? '').toString(),
                         style: TextStyle(
                           color: Colors.green[700],
                           fontWeight: FontWeight.bold,
@@ -661,7 +688,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                       Icon(Icons.access_time, color: Colors.orange[700], size: 16),
                       const SizedBox(width: 4),
                       Text(
-                        (widget.store['storeTime'] ?? '').toString(),
+                        (_normalizedStore['storeTime'] ?? '30-45 min').toString(),
                         style: TextStyle(
                           color: Colors.orange[700],
                           fontWeight: FontWeight.bold,
@@ -682,7 +709,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
             ),
             const SizedBox(height: 8),
             Text(
-              widget.store['storeDescription'] ?? '',
+              _normalizedStore['storeDescription'] ?? '',
               style: TextStyle(
                 color: Colors.grey[600],
                 height: 1.5,
@@ -712,19 +739,48 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
       print('⚠️ Product item missing required fields: $item');
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return GestureDetector(
+      onTap: () {
+        print('Product card tapped: ${item['name']}');
+        print('Item data: $item');
+        try {
+          // Convert the item to a Product object and navigate to product details
+          final product = Product(
+            id: item['_id']?.toString() ?? item['id']?.toString() ?? item['name']?.toString() ?? '',
+            name: item['name']?.toString() ?? 'Unnamed Product',
+            price: (item['price'] is int) ? (item['price'] as int).toDouble() : (item['price'] ?? 0.0),
+            imageUrl: item['image']?.toString() ?? item['imageUrl']?.toString() ?? '',
+            category: item['category']?.toString() ?? 'Food',
+            rating: 4.5,
+            reviews: 120,
+            isAvailable: true,
+            deliveryFee: 0.0,
+            description: item['description']?.toString() ?? 'Delicious food item',
+            images: [(item['image']?.toString() ?? item['imageUrl']?.toString() ?? '')],
+            vendorId: item['vendorId']?.toString() ?? _normalizedStore['_id']?.toString() ?? 'store1',
+          );
+          
+          print('Navigating to product details with product: ${product.name}');
+          print('Route: ${AppRoutes.productDetails}');
+          print('Route constant value: "${AppRoutes.productDetails}"');
+          Navigator.push(context, MaterialPageRoute(builder: (context) => ProductDetailsScreen(product: product)));
+        } catch (e) {
+          print('Error navigating to product details: $e');
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -756,7 +812,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                               'quantity': 1,
                               'notes': '',
                               'image': item['image'] ?? item['imageUrl'] ?? '',
-                              'vendorId': item['vendorId'] ?? widget.store['_id'],
+                              'vendorId': item['vendorId'] ?? _normalizedStore['_id'],
                             });
                           },
                           child: Container(
@@ -899,7 +955,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
           ),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildFullMenu() {
@@ -1024,8 +1080,8 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
 
   Widget _buildReviewsAndRatings() {
     // Use store fields for now
-    final rating = (widget.store['storeRating'] ?? 0).toString();
-    final reviews = (widget.store['storeReviews'] ?? 0).toString();
+    final rating = (_normalizedStore['storeRating'] ?? 0).toString();
+    final reviews = (_normalizedStore['storeReviews'] ?? 0).toString();
     return SliverToBoxAdapter(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

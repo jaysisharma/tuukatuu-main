@@ -123,6 +123,10 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildSearchBar() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    
+    // T-Mart color scheme
+    const Color tmartGreen = Color(0xFF2E7D32);
+    const Color tmartLightGreen = Color(0xFF4CAF50);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -140,7 +144,7 @@ class _SearchScreenState extends State<SearchScreen> {
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back),
+            icon: const Icon(Icons.arrow_back, color: tmartGreen),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
@@ -149,8 +153,9 @@ class _SearchScreenState extends State<SearchScreen> {
             child: Container(
               height: 44,
               decoration: BoxDecoration(
-                color: isDark ? Colors.grey[800] : Colors.grey[100],
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: tmartGreen.withOpacity(0.3)),
               ),
               child: TextField(
                 controller: _searchController,
@@ -161,12 +166,12 @@ class _SearchScreenState extends State<SearchScreen> {
                 decoration: InputDecoration(
                   hintText: 'Search for items...',
                   hintStyle: TextStyle(
-                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    color: Colors.grey[600],
                     fontSize: 16,
                   ),
                   prefixIcon: Icon(
                     Icons.search_rounded,
-                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    color: tmartGreen,
                   ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -180,12 +185,12 @@ class _SearchScreenState extends State<SearchScreen> {
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: isDark ? Colors.grey[800] : Colors.grey[100],
+                color: tmartGreen,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.tune_rounded,
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                color: Colors.white,
                 size: 24,
               ),
             ),

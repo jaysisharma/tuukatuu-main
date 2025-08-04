@@ -114,31 +114,83 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final addressProvider = Provider.of<AddressProvider>(context, listen: false);
-      print('🔍 Checkout: Fetching addresses...');
-      // Always fetch addresses to ensure they're loaded
-      addressProvider.fetchAddresses().then((_) {
-        print('🔍 Checkout: Addresses loaded: ${addressProvider.addresses.length}');
-        if (mounted) {
-          setState(() {
-            // Reset selected address index if current selection is invalid
-            if (_selectedAddressIndex >= addressProvider.addresses.length) {
-              _selectedAddressIndex = addressProvider.addresses.isNotEmpty ? 0 : -1;
+      _initializeAddressProvider();
+    });
+  }
+
+  void _initializeAddressProvider() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+    
+    print('🔍 Checkout: Initializing address provider...');
+    print('🔍 Checkout: JWT Token available: ${authProvider.jwtToken != null}');
+    
+    if (authProvider.jwtToken != null) {
+      print('🔍 Checkout: JWT Token: ${authProvider.jwtToken!.substring(0, 20)}...');
+      addressProvider.initialize(authProvider.jwtToken!);
+      print('🔍 Checkout: Address provider initialized with token');
+      
+      // Test API connection first
+      _testApiConnection().then((isConnected) {
+        if (isConnected) {
+          print('🔍 Checkout: API connection successful, fetching addresses...');
+          // Fetch addresses after initialization
+          addressProvider.fetchAddresses().then((_) {
+            print('🔍 Checkout: Addresses loaded: ${addressProvider.addresses.length}');
+            if (mounted) {
+              setState(() {
+                // Reset selected address index if current selection is invalid
+                if (_selectedAddressIndex >= addressProvider.addresses.length) {
+                  _selectedAddressIndex = addressProvider.addresses.isNotEmpty ? 0 : -1;
+                }
+              });
+            }
+          }).catchError((error) {
+            print('❌ Error fetching addresses: $error');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to load addresses: $error'),
+                  backgroundColor: Colors.red,
+                ),
+              );
             }
           });
-        }
-      }).catchError((error) {
-        print('❌ Error fetching addresses: $error');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to load addresses: $error'),
-              backgroundColor: Colors.red,
-            ),
-          );
+        } else {
+          print('❌ Checkout: API connection failed');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Unable to connect to server. Please check your internet connection.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
       });
-    });
+    } else {
+      print('❌ Checkout: No JWT token available');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Authentication required. Please login again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<bool> _testApiConnection() async {
+    try {
+      print('🔍 Checkout: Testing API connection...');
+      final response = await ApiService.get('/auth/me', token: Provider.of<AuthProvider>(context, listen: false).jwtToken);
+      print('🔍 Checkout: API connection test successful: $response');
+      return true;
+    } catch (e) {
+      print('❌ Checkout: API connection test failed: $e');
+      return false;
+    }
   }
 
   @override
@@ -173,9 +225,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final addresses = addressProvider.addresses;
     final showMoreButton = !_showAllAddresses && addresses.length > 2;
     final visibleAddresses = showMoreButton ? addresses.take(2).toList() : addresses;
+    
+    print('🔍 Checkout Build: Addresses count: ${addresses.length}, Loading: ${addressProvider.isLoading}');
+    print('🔍 Checkout Build: Selected address index: $_selectedAddressIndex');
+    print('🔍 Checkout Build: Visible addresses: ${visibleAddresses.length}');
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          icon: const Icon(Icons.arrow_back),
+        ),
         title: Text(
           widget.isTmartOrder ? 'T-Mart Checkout' : 'Checkout',
           style: const TextStyle(
@@ -441,8 +503,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final tip = _getSelectedTip();
     final total = itemTotal + tax + deliveryFee + tip;
 
+    // Get vendorId from cart items
+    String? vendorId;
+    if (widget.cartItems.isNotEmpty) {
+      final firstItem = widget.cartItems.first;
+      vendorId = firstItem['vendorId']?.toString();
+    }
+    
+    // Fallback to hardcoded values if not found
+    if (vendorId == null || vendorId.isEmpty) {
+      vendorId = isTmartOrder ? 'tmart' : 'vendor_id';
+    }
+    
+    print("Checkout - Vendor ID: $vendorId");
+    print("Checkout - Cart items: ${widget.cartItems.length}");
+    if (widget.cartItems.isNotEmpty) {
+      print("Checkout - First cart item: ${widget.cartItems.first}");
+    }
+    
     final orderPayload = {
-      'vendorId': isTmartOrder ? 'tmart' : 'vendor_id', // Replace with actual vendor ID
+      'vendorId': vendorId,
       'items': widget.cartItems.map((item) => ({
         'productId': item['id'],
         'name': item['name'],
@@ -477,22 +557,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         body: orderPayload,
       );
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Order placed successfully!'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      // Order placed successfully
       
       Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to place order: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      // Silent error handling
     }
   }
 

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../models/product.dart';
+import '../../models/store.dart';
 import '../../core/config/routes.dart';
 import '../../widgets/cached_image.dart';
+import '../../widgets/store_cart_banner.dart';
 import 'package:provider/provider.dart';
 import '../../providers/unified_cart_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/store_service.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final Product product;
@@ -37,10 +40,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     },
   ];
 
+  // Store information
+  Store? _store;
+  bool _loadingStore = false;
+
   @override
   void initState() {
     super.initState();
     _fetchSimilarProducts();
+    _fetchStoreInfo();
     _updateCartQuantity();
   }
 
@@ -68,21 +76,51 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       _errorSimilar = null;
     });
     try {
-      final data = await ApiService.get('/products?category=${Uri.encodeComponent(widget.product.category)}');
-      final products = (data['products'] as List)
-          .map((json) => Product.fromJson(json))
-          .where((p) => p.id != widget.product.id)
-          .take(8)
-        .toList();
-      setState(() {
-        _similarProducts = products;
-        _loadingSimilar = false;
+      final response = await ApiService.get('/tmart/similar-general', params: {
+        'productId': widget.product.id,
+        'limit': '8',
       });
+
+      if (response['success'] && response['data'] != null) {
+        final products = (response['data'] as List)
+            .map((json) => Product.fromJson(json))
+            .toList();
+        setState(() {
+          _similarProducts = products;
+          _loadingSimilar = false;
+        });
+      } else {
+        setState(() {
+          _similarProducts = [];
+          _loadingSimilar = false;
+        });
+      }
     } catch (e) {
       setState(() {
         _loadingSimilar = false;
         _errorSimilar = e.toString();
       });
+    }
+  }
+
+  Future<void> _fetchStoreInfo() async {
+    if (widget.product.vendorId == null) return;
+    
+    setState(() {
+      _loadingStore = true;
+    });
+    try {
+      final store = await StoreService.getStoreById(widget.product.vendorId!);
+      setState(() {
+        _store = store ?? Store.demoStore;
+        _loadingStore = false;
+      });
+    } catch (e) {
+      setState(() {
+        _store = Store.demoStore;
+        _loadingStore = false;
+      });
+      // Store info is optional, so we don't show error
     }
   }
 
@@ -102,9 +140,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   Widget _buildProductCard(Product product) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final cartProvider = Provider.of<UnifiedCartProvider>(context, listen: false);
 
     return Container(
-      width: 160,
+      width: 180,
       margin: const EdgeInsets.only(right: 16),
       child: Card(
         elevation: 2,
@@ -118,7 +157,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                   child: CachedImage(
                     imageUrl: product.imageUrl,
-                    height: 120,
+                    height: 100,
                     width: double.infinity,
                     fit: BoxFit.cover,
                   ),
@@ -165,38 +204,69 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Rs ${product.price}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
                   const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Add to cart logic
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${product.name} added to cart'),
-                            behavior: SnackBarBehavior.floating,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Rs ${product.price}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: theme.colorScheme.primary,
                           ),
-                        );
-                        Navigator.pushNamed(context, AppRoutes.cart);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        textStyle: const TextStyle(fontSize: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Text('Add to Cart'),
-                    ),
+                      GestureDetector(
+                        onTap: () {
+                          // Add to cart logic
+                          cartProvider.addStoreItem(
+                            id: product.id,
+                            name: product.name,
+                            price: product.price,
+                            quantity: 1,
+                            image: product.imageUrl,
+                            vendorId: product.vendorId,
+                            store: _store,
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${product.name} added to cart'),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: theme.colorScheme.primary,
+                              action: SnackBarAction(
+                                label: 'View Cart',
+                                textColor: Colors.white,
+                                onPressed: () {
+                                  Navigator.pushNamed(context, '/multi-store-cart');
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.add,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -310,43 +380,62 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     final cartProvider = Provider.of<UnifiedCartProvider>(context);
     final theme = Theme.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Check if this product is in cart
+    final cartItem = cartProvider.items.firstWhere(
+      (item) => item.id == widget.product.id && item.type == CartItemType.store,
+      orElse: () => CartItem(
+        id: '',
+        name: '',
+        price: 0,
+        quantity: 0,
+        image: '',
+        type: CartItemType.store,
+      ),
+    );
+    final isInCart = cartItem.id.isNotEmpty;
+    
+    // Update cart quantity when cart changes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _updateCartQuantity();
+      }
+    });
+    
     return Scaffold(
       floatingActionButton: cartProvider.items.isNotEmpty
           ? FloatingActionButton(
               onPressed: () {
-                Navigator.pushNamed(context, AppRoutes.cart);
+                Navigator.pushNamed(context, AppRoutes.multiStoreCart);
               },
               backgroundColor: Colors.orange,
               child: Stack(
-                clipBehavior: Clip.none,
                 children: [
                   const Icon(Icons.shopping_cart, color: Colors.white),
-                  if (cartProvider.items.isNotEmpty)
-                    Positioned(
-                      right: -8,
-                      top: -8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 20,
+                        minHeight: 20,
+                      ),
+                      child: Text(
+                        '${cartProvider.items.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
                         ),
-                        constraints: const BoxConstraints(
-                          minWidth: 20,
-                          minHeight: 20,
-                        ),
-                        child: Text(
-                          '${cartProvider.items.length}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
+                  ),
                 ],
               ),
             )
@@ -566,23 +655,152 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         ],
                       ),
                     ),
-                    _buildFrequentlyBoughtTogether(),
-                    _buildSectionTitle('Similar Products'),
-                    if (_loadingSimilar)
-                      const Center(child: CircularProgressIndicator())
-                    else if (_errorSimilar != null)
-                      Center(child: Text(_errorSimilar!, style: const TextStyle(color: Colors.red)))
-                    else if (_similarProducts.isEmpty)
-                      const Center(child: Text('No similar products found'))
-                    else
-                    SizedBox(
-                      height: 260,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _similarProducts.length,
-                        itemBuilder: (context, index) => _buildProductCard(_similarProducts[index]),
-                      ),
+                    // _buildFrequentlyBoughtTogether(),
+                    // Similar Products Section
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildSectionTitle('Similar Products'),
+                            if (_loadingSimilar)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 16),
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (_loadingSimilar)
+                          SizedBox(
+                            height: 240,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              scrollDirection: Axis.horizontal,
+                              itemCount: 3,
+                              itemBuilder: (context, index) {
+                                return Container(
+                                  width: 180,
+                                  margin: const EdgeInsets.only(right: 16),
+                                  child: Card(
+                                    elevation: 2,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          height: 100,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[200],
+                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                                          ),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Container(
+                                                height: 12,
+                                                width: double.infinity,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey[300],
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Container(
+                                                height: 10,
+                                                width: 60,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey[300],
+                                                  borderRadius: BorderRadius.circular(5),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          )
+                        else if (_errorSimilar != null)
+                          Container(
+                            height: 100,
+                            margin: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.red[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.red[200]!),
+                            ),
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.error_outline, color: Colors.red[400], size: 24),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Failed to load similar products',
+                                    style: TextStyle(
+                                      color: Colors.red[600],
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else if (_similarProducts.isEmpty)
+                          Container(
+                            height: 100,
+                            margin: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.search_off,
+                                    color: Colors.grey[400],
+                                    size: 32,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'No similar products found',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else
+                          SizedBox(
+                            height: 240,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _similarProducts.length,
+                              itemBuilder: (context, index) => _buildProductCard(_similarProducts[index]),
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -622,6 +840,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           quantity: _quantity,
                           image: widget.product.imageUrl,
                           vendorId: widget.product.vendorId,
+                          store: _store,
                         );
                         setState(() {
                           _cartQuantity = _quantity;
@@ -630,6 +849,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           SnackBar(
                             content: Text('${widget.product.name} (x$_quantity) added to cart'),
                             behavior: SnackBarBehavior.floating,
+                            action: SnackBarAction(
+                              label: 'View Cart',
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/multi-store-cart');
+                              },
+                            ),
                           ),
                         );
                       },

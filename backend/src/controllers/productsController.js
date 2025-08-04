@@ -38,6 +38,106 @@ exports.getAllProducts = async (req, res) => {
   }
 };
 
+exports.getProductsByVendorType = async (req, res) => {
+  try {
+    const { vendorType, vendorSubType, page = 1, limit = 20 } = req.query;
+    
+    if (!vendorType) {
+      return res.status(400).json({ message: 'vendorType parameter is required' });
+    }
+
+    const query = {
+      isAvailable: true,
+      vendorId: { $exists: true, $ne: null }
+    };
+
+    if (vendorType) {
+      query.vendorType = vendorType;
+    }
+
+    if (vendorSubType) {
+      query.vendorSubType = vendorSubType;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Get products with vendor details
+    const products = await Product.find(query)
+      .populate({
+        path: 'vendorId',
+        select: 'storeName storeDescription storeImage storeRating storeReviews storeAddress vendorType vendorSubType'
+      })
+      .sort({ rating: -1, reviews: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Group products by vendor
+    const vendorsWithProducts = {};
+    
+    products.forEach(product => {
+      if (!product.vendorId || !product.vendorId._id) {
+        console.log('Skipping product without valid vendorId:', product._id);
+        return;
+      }
+
+      const vendorId = product.vendorId._id.toString();
+      
+      if (!vendorsWithProducts[vendorId]) {
+        vendorsWithProducts[vendorId] = {
+          vendor: {
+            _id: product.vendorId._id,
+            storeName: product.vendorId.storeName || 'Unknown Store',
+            storeDescription: product.vendorId.storeDescription || '',
+            storeImage: product.vendorId.storeImage || '',
+            storeRating: product.vendorId.storeRating || 0,
+            storeReviews: product.vendorId.storeReviews || 0,
+            storeAddress: product.vendorId.storeAddress || '',
+            vendorType: product.vendorId.vendorType || 'store',
+            vendorSubType: product.vendorId.vendorSubType || ''
+          },
+          products: []
+        };
+      }
+      
+      vendorsWithProducts[vendorId].products.push({
+        _id: product._id,
+        name: product.name,
+        price: product.price,
+        imageUrl: product.imageUrl,
+        description: product.description,
+        unit: product.unit,
+        rating: product.rating,
+        reviews: product.reviews,
+        isPopular: product.isPopular,
+        isFeatured: product.isFeatured,
+        vendorType: product.vendorType,
+        vendorSubType: product.vendorSubType
+      });
+    });
+
+    const total = await Product.countDocuments(query);
+    const totalPages = Math.ceil(total / parseInt(limit));
+
+    console.log(`🔍 Found ${products.length} products for vendorType: ${vendorType}, vendorSubType: ${vendorSubType}`);
+
+    res.json({
+      success: true,
+      data: Object.values(vendorsWithProducts),
+      total,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages
+      },
+      filters: { vendorType, vendorSubType }
+    });
+  } catch (err) {
+    console.error('Error getting products by vendor type:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
 exports.getProductsByCategory = async (req, res) => {
   try {
     const { category, page = 1, limit = 20 } = req.query;

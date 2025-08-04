@@ -162,10 +162,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             pinned: true,
             backgroundColor: theme.cardColor,
             elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.pop(context),
-            ),
+            
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: BoxDecoration(

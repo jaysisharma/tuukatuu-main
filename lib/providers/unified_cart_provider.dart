@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/store.dart';
 
 enum CartItemType { store, tmart }
 
@@ -13,6 +14,7 @@ class CartItem {
   final CartItemType type;
   final String? notes;
   final Map<String, dynamic>? additionalData;
+  final Store? store;
 
   CartItem({
     required this.id,
@@ -25,6 +27,7 @@ class CartItem {
     this.vendorName,
     this.notes,
     this.additionalData,
+    this.store,
   });
 
   Map<String, dynamic> toJson() {
@@ -39,6 +42,7 @@ class CartItem {
       'type': type.name,
       'notes': notes,
       'additionalData': additionalData,
+      'store': store?.toJson(),
     };
   }
 
@@ -53,6 +57,7 @@ class CartItem {
     CartItemType? type,
     String? notes,
     Map<String, dynamic>? additionalData,
+    Store? store,
   }) {
     return CartItem(
       id: id ?? this.id,
@@ -65,6 +70,7 @@ class CartItem {
       type: type ?? this.type,
       notes: notes ?? this.notes,
       additionalData: additionalData ?? this.additionalData,
+      store: store ?? this.store,
     );
   }
 }
@@ -136,6 +142,7 @@ class UnifiedCartProvider extends ChangeNotifier {
     String? vendorName,
     String? notes,
     Map<String, dynamic>? additionalData,
+    Store? store,
   }) {
     addItem(CartItem(
       id: id,
@@ -148,6 +155,7 @@ class UnifiedCartProvider extends ChangeNotifier {
       type: CartItemType.store,
       notes: notes,
       additionalData: additionalData,
+      store: store,
     ));
   }
 
@@ -233,6 +241,59 @@ class UnifiedCartProvider extends ChangeNotifier {
     return _items.where((item) => item.type == type).toList();
   }
 
+  // Get store items grouped by vendor
+  Map<String, List<CartItem>> getStoreItemsByVendor() {
+    final storeItems = getItemsByType(CartItemType.store);
+    final grouped = <String, List<CartItem>>{};
+    
+    for (final item in storeItems) {
+      final vendorId = item.vendorId ?? 'unknown';
+      if (!grouped.containsKey(vendorId)) {
+        grouped[vendorId] = [];
+      }
+      grouped[vendorId]!.add(item);
+    }
+    
+    return grouped;
+  }
+
+  // Get unique stores in cart
+  List<Store> getUniqueStores() {
+    final storeItems = getItemsByType(CartItemType.store);
+    final storeIds = <String>{};
+    final stores = <Store>[];
+    
+    for (final item in storeItems) {
+      if (item.store != null && !storeIds.contains(item.store!.id)) {
+        storeIds.add(item.store!.id);
+        stores.add(item.store!);
+      }
+    }
+    
+    return stores;
+  }
+
+  // Get items for a specific store
+  List<CartItem> getItemsForStore(String storeId) {
+    return _items.where((item) => 
+      item.type == CartItemType.store && 
+      item.vendorId == storeId
+    ).toList();
+  }
+
+  // Get total amount for a specific store
+  double getStoreTotal(String storeId) {
+    final storeItems = getItemsForStore(storeId);
+    return storeItems.fold(0, (sum, item) => sum + (item.price * item.quantity));
+  }
+
+  // Check if cart has multiple stores
+  bool get hasMultipleStores {
+    final storeItems = getItemsByType(CartItemType.store);
+    final vendorIds = storeItems.map((item) => item.vendorId).where((id) => id != null).toSet();
+    return vendorIds.length > 1;
+  }
+
   // Check if item exists
   bool hasItem(String itemId, CartItemType type) {
     return _items.any((item) => item.id == itemId && item.type == type);
@@ -254,6 +315,7 @@ class UnifiedCartProvider extends ChangeNotifier {
   // Convert to order format
   List<Map<String, dynamic>> getOrderItems() {
     return _items.map((item) => {
+      'id': item.id,
       'product': item.id,
       'quantity': item.quantity,
       'price': item.price,
@@ -261,6 +323,10 @@ class UnifiedCartProvider extends ChangeNotifier {
       'image': item.image,
       'type': item.type.name,
       'notes': item.notes,
+      'unit': 'piece',
+      'orderType': item.type == CartItemType.tmart ? 'tmart' : 'regular',
+      'vendorId': item.vendorId,
+      'vendorName': item.vendorName,
     }).toList();
   }
 

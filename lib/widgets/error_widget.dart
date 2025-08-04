@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/error_service.dart';
 
 class CustomErrorWidget extends StatelessWidget {
   final String message;
@@ -6,6 +7,7 @@ class CustomErrorWidget extends StatelessWidget {
   final VoidCallback? onRetry;
   final IconData? icon;
   final Color? color;
+  final String? errorType;
 
   const CustomErrorWidget({
     super.key,
@@ -14,10 +16,14 @@ class CustomErrorWidget extends StatelessWidget {
     this.onRetry,
     this.icon,
     this.color,
+    this.errorType,
   });
 
   @override
   Widget build(BuildContext context) {
+    final displayIcon = icon ?? (errorType != null ? ErrorService.getErrorIcon(errorType!) : Icons.error_outline);
+    final displayColor = color ?? Theme.of(context).colorScheme.error;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -25,9 +31,9 @@ class CustomErrorWidget extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              icon ?? Icons.error_outline,
+              displayIcon,
               size: 64,
-              color: color ?? Theme.of(context).colorScheme.error,
+              color: displayColor,
             ),
             const SizedBox(height: 16),
             if (title != null) ...[
@@ -35,7 +41,7 @@ class CustomErrorWidget extends StatelessWidget {
                 title!,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: color ?? Theme.of(context).colorScheme.error,
+                  color: displayColor,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -55,7 +61,7 @@ class CustomErrorWidget extends StatelessWidget {
                 icon: const Icon(Icons.refresh),
                 label: const Text('Retry'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: color ?? Theme.of(context).primaryColor,
+                  backgroundColor: displayColor,
                   foregroundColor: Colors.white,
                 ),
               ),
@@ -67,50 +73,46 @@ class CustomErrorWidget extends StatelessWidget {
   }
 }
 
-class NetworkErrorWidget extends StatelessWidget {
-  final VoidCallback? onRetry;
+// Widget for showing loading states
+class LoadingWidget extends StatelessWidget {
   final String? message;
+  final double? size;
 
-  const NetworkErrorWidget({
+  const LoadingWidget({
     super.key,
-    this.onRetry,
     this.message,
+    this.size,
   });
 
   @override
   Widget build(BuildContext context) {
-    return CustomErrorWidget(
-      title: 'Network Error',
-      message: message ?? 'Please check your internet connection and try again.',
-      icon: Icons.wifi_off,
-      onRetry: onRetry,
-      color: Colors.orange,
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: size ?? 32,
+            height: size ?? 32,
+            child: const CircularProgressIndicator(),
+          ),
+          if (message != null) ...[
+            const SizedBox(height: 16),
+            Text(
+              message!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
 
-class ServerErrorWidget extends StatelessWidget {
-  final VoidCallback? onRetry;
-  final String? message;
-
-  const ServerErrorWidget({
-    super.key,
-    this.onRetry,
-    this.message,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomErrorWidget(
-      title: 'Server Error',
-      message: message ?? 'Something went wrong on our end. Please try again later.',
-      icon: Icons.cloud_off,
-      onRetry: onRetry,
-      color: Colors.red,
-    );
-  }
-}
-
+// Widget for showing empty states
 class EmptyStateWidget extends StatelessWidget {
   final String title;
   final String message;
@@ -131,6 +133,8 @@ class EmptyStateWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayColor = color ?? Colors.grey;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -140,40 +144,98 @@ class EmptyStateWidget extends StatelessWidget {
             Icon(
               icon,
               size: 64,
-              color: color ?? Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              color: displayColor.withOpacity(0.5),
             ),
             const SizedBox(height: 16),
             Text(
               title,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              style: const TextStyle(
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: color ?? Theme.of(context).colorScheme.primary,
+                color: Colors.grey,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               message,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
               ),
               textAlign: TextAlign.center,
             ),
             if (onAction != null && actionText != null) ...[
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
+              const SizedBox(height: 16),
+              ElevatedButton(
                 onPressed: onAction,
-                icon: const Icon(Icons.add),
-                label: Text(actionText!),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: color ?? Theme.of(context).primaryColor,
-                  foregroundColor: Colors.white,
-                ),
+                child: Text(actionText!),
               ),
             ],
           ],
         ),
       ),
+    );
+  }
+}
+
+// Widget for showing network error with retry
+class NetworkErrorWidget extends StatelessWidget {
+  final VoidCallback? onRetry;
+  final String? customMessage;
+
+  const NetworkErrorWidget({
+    super.key,
+    this.onRetry,
+    this.customMessage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomErrorWidget(
+      errorType: ErrorService.networkError,
+      message: customMessage ?? ErrorService.getErrorMessage(ErrorService.networkError),
+      onRetry: onRetry,
+    );
+  }
+}
+
+// Widget for showing server error with retry
+class ServerErrorWidget extends StatelessWidget {
+  final VoidCallback? onRetry;
+  final String? customMessage;
+
+  const ServerErrorWidget({
+    super.key,
+    this.onRetry,
+    this.customMessage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomErrorWidget(
+      errorType: ErrorService.serverError,
+      message: customMessage ?? ErrorService.getErrorMessage(ErrorService.serverError),
+      onRetry: onRetry,
+    );
+  }
+}
+
+// Widget for showing authentication error
+class AuthenticationErrorWidget extends StatelessWidget {
+  final VoidCallback? onRetry;
+
+  const AuthenticationErrorWidget({
+    super.key,
+    this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomErrorWidget(
+      errorType: ErrorService.authenticationError,
+      message: ErrorService.getErrorMessage(ErrorService.authenticationError),
+      onRetry: onRetry,
     );
   }
 } 

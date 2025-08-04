@@ -30,6 +30,7 @@ export default function AdminLayout() {
                       <li><NavLink to="/admin/featured-categories" className={({isActive}) => isActive ? 'block px-6 py-2 bg-primary text-white rounded' : 'block px-6 py-2 text-gray-700 hover:bg-gray-100 rounded'}>Featured Categories</NavLink></li>
                       <li><NavLink to="/admin/coupons" className={({isActive}) => isActive ? 'block px-6 py-2 bg-primary text-white rounded' : 'block px-6 py-2 text-gray-700 hover:bg-gray-100 rounded'}>Coupons</NavLink></li>
                       <li><NavLink to="/admin/banners" className={({isActive}) => isActive ? 'block px-6 py-2 bg-primary text-white rounded' : 'block px-6 py-2 text-gray-700 hover:bg-gray-100 rounded'}>Banners</NavLink></li>
+                      <li><NavLink to="/admin/today-deals" className={({isActive}) => isActive ? 'block px-6 py-2 bg-primary text-white rounded' : 'block px-6 py-2 text-gray-700 hover:bg-gray-100 rounded'}>Today's Deals</NavLink></li>
             <li><NavLink to="/admin/sales-analytics" className={({isActive}) => isActive ? 'block px-6 py-2 bg-primary text-white rounded' : 'block px-6 py-2 text-gray-700 hover:bg-gray-100 rounded'}>Sales & Analytics</NavLink></li>
             <li><NavLink to="/admin/settings" className={({isActive}) => isActive ? 'block px-6 py-2 bg-primary text-white rounded' : 'block px-6 py-2 text-gray-700 hover:bg-gray-100 rounded'}>Settings</NavLink></li>
           </ul>

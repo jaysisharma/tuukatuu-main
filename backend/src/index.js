@@ -9,6 +9,28 @@ const Coupon = require('./models/Coupon');
 const User = require('./models/User');
 const Address = require('./models/Address');
 
+// Import routes
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const vendorRoutes = require('./routes/vendors');
+const productRoutes = require('./routes/products');
+const orderRoutes = require('./routes/orders');
+const addressRoutes = require('./routes/addresses');
+const adminRoutes = require('./routes/admin');
+const adminFeaturedProductsRoutes = require('./routes/adminFeaturedProducts');
+const adminBannersRoutes = require('./routes/adminBanners');
+const bannersRoutes = require('./routes/banners');
+const adminCategoriesRoutes = require('./routes/adminCategories');
+const categoriesRoutes = require('./routes/categories');
+const adminOrdersRoutes = require('./routes/adminOrders');
+const adminUsersRoutes = require('./routes/adminUsers');
+const adminVendorsRoutes = require('./routes/adminVendors');
+const adminProductsRoutes = require('./routes/adminProducts');
+const adminAddressesRoutes = require('./routes/adminAddresses');
+const favoritesRoutes = require('./routes/favorites');
+const tmartRoutes = require('./routes/tmart');
+const todayDealsRoutes = require('./routes/todayDeals');
+
 // Load environment variables from .env
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
@@ -40,9 +62,27 @@ app.get('/', (req, res) => {
   res.send('Tuukatuu Backend API is running');
 });
 
-// Routes (Assuming you have an `index.js` inside /routes folder)
-const apiRouter = require('./routes');
-app.use('/api', apiRouter);
+// Use routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/vendors', vendorRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/addresses', addressRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/admin/featured-products', adminFeaturedProductsRoutes);
+app.use('/api/admin/banners', adminBannersRoutes);
+app.use('/api/banners', bannersRoutes);
+app.use('/api/admin/categories', adminCategoriesRoutes);
+app.use('/api/categories', categoriesRoutes);
+app.use('/api/admin/orders', adminOrdersRoutes);
+app.use('/api/admin/users', adminUsersRoutes);
+app.use('/api/admin/vendors', adminVendorsRoutes);
+app.use('/api/admin/products', adminProductsRoutes);
+app.use('/api/admin/addresses', adminAddressesRoutes);
+app.use('/api/favorites', favoritesRoutes);
+app.use('/api/tmart', tmartRoutes);
+app.use('/api', todayDealsRoutes);
 
 // Seed products if --seed-products flag is present
 if (process.argv.includes('--seed-products')) {
@@ -80,9 +120,9 @@ if (process.argv.includes('--seed-coupons')) {
 
 // Seed vendors if --seed-vendors flag is present
 if (process.argv.includes('--seed-vendors')) {
-  User.seedVendors().then((vendors) => {
+  const Vendor = require('./models/Vendor');
+  Vendor.seedVendors().then(() => {
     console.log('Vendors seeded successfully.');
-    console.log(vendors);
     process.exit(0);
   }).catch((err) => {
     console.error('Error seeding vendors:', err);

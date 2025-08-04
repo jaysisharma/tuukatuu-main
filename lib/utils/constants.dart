@@ -1,137 +1,119 @@
+import '../core/config/app_config.dart';
+
 class AppConstants {
   // App Info
-  static const String appName = 'Tuukatuu';
-  static const String appVersion = '1.0.0';
+  static const String appName = AppConfig.appName;
+  static const String appVersion = AppConfig.appVersion;
   
   // Colors
   static const int primaryColorValue = 0xFF2E7D32;
   static const int secondaryColorValue = 0xFFFF6B35;
   static const int backgroundColorValue = 0xFFF8F9FA;
   
-  // API Endpoints
-  static const String baseUrl = 'http://localhost:3000/api';
-  static const String tmartBaseUrl = 'http://localhost:3000/api/tmart';
+  // API Endpoints - Now using centralized config
+  static String get baseUrl => AppConfig.baseUrl;
+  static String get tmartBaseUrl => AppConfig.tmartBaseUrl;
   
   // Pagination
-  static const int defaultPageSize = 20;
-  static const int maxPageSize = 100;
+  static const int defaultPageSize = AppConfig.defaultPageSize;
+  static const int maxPageSize = AppConfig.maxPageSize;
   
   // Timeouts
-  static const int apiTimeoutSeconds = 30;
-  static const int connectionTimeoutSeconds = 10;
+  static const int apiTimeoutSeconds = AppConfig.apiTimeoutSeconds;
+  static const int connectionTimeoutSeconds = AppConfig.connectionTimeoutSeconds;
   
   // Cache
-  static const int cacheExpiryHours = 24;
-  static const int imageCacheExpiryDays = 7;
+  static const int cacheExpiryHours = AppConfig.cacheExpiryHours;
+  static const int imageCacheExpiryDays = AppConfig.imageCacheExpiryDays;
   
   // Validation
-  static const int minPasswordLength = 6;
-  static const int maxPasswordLength = 50;
-  static const int minNameLength = 2;
-  static const int maxNameLength = 50;
+  static const int minPasswordLength = AppConfig.minPasswordLength;
+  static const int maxPasswordLength = AppConfig.maxPasswordLength;
+  static const int minNameLength = AppConfig.minNameLength;
+  static const int maxNameLength = AppConfig.maxNameLength;
   
   // File Upload
-  static const int maxImageSizeMB = 5;
-  static const int maxFileSizeMB = 10;
-  static const List<String> allowedImageTypes = ['jpg', 'jpeg', 'png', 'webp'];
+  static const int maxImageSizeMB = AppConfig.maxImageSizeMB;
+  static const int maxFileSizeMB = AppConfig.maxFileSizeMB;
+  static const List<String> allowedImageTypes = AppConfig.allowedImageTypes;
   
   // Order Status
-  static const List<String> orderStatuses = [
-    'pending',
-    'confirmed',
-    'preparing',
-    'outfordelivery',
-    'delivered',
-    'cancelled',
-    'failed'
-  ];
+  static const List<String> orderStatuses = AppConfig.orderStatuses;
   
   // Payment Methods
-  static const List<String> paymentMethods = [
-    'cash',
-    'esewa',
-    'khalti',
-    'fonepay',
-    'connectips',
-    'imepay'
-  ];
+  static const List<String> paymentMethods = AppConfig.paymentMethods;
   
   // Delivery Times
-  static const List<String> deliveryTimes = [
-    'As soon as possible',
-    'In 30 minutes',
-    'In 1 hour',
-    'In 2 hours'
-  ];
+  static const List<String> deliveryTimes = AppConfig.deliveryTimes;
   
   // Tip Options
-  static const List<int> tipOptions = [20, 50, 100];
+  static const List<int> tipOptions = AppConfig.tipOptions;
   
   // Error Messages
-  static const String networkError = 'Network error. Please check your connection.';
-  static const String serverError = 'Server error. Please try again later.';
-  static const String unknownError = 'An unknown error occurred.';
-  static const String invalidCredentials = 'Invalid email or password.';
-  static const String emailAlreadyExists = 'Email already exists.';
-  static const String weakPassword = 'Password is too weak.';
+  static const String networkError = AppConfig.networkError;
+  static const String serverError = AppConfig.serverError;
+  static const String unknownError = AppConfig.unknownError;
+  static const String invalidCredentials = AppConfig.invalidCredentials;
+  static const String emailAlreadyExists = AppConfig.emailAlreadyExists;
+  static const String weakPassword = AppConfig.weakPassword;
   
   // Success Messages
-  static const String loginSuccess = 'Login successful!';
-  static const String signupSuccess = 'Account created successfully!';
-  static const String profileUpdated = 'Profile updated successfully!';
-  static const String passwordChanged = 'Password changed successfully!';
-  static const String orderPlaced = 'Order placed successfully!';
-  static const String orderCancelled = 'Order cancelled successfully!';
+  static const String loginSuccess = AppConfig.loginSuccess;
+  static const String signupSuccess = AppConfig.signupSuccess;
+  static const String profileUpdated = AppConfig.profileUpdated;
+  static const String passwordChanged = AppConfig.passwordChanged;
+  static const String orderPlaced = AppConfig.orderPlaced;
+  static const String orderCancelled = AppConfig.orderCancelled;
   
   // Loading Messages
-  static const String loading = 'Loading...';
-  static const String processing = 'Processing...';
-  static const String uploading = 'Uploading...';
-  static const String saving = 'Saving...';
+  static const String loading = AppConfig.loading;
+  static const String processing = AppConfig.processing;
+  static const String uploading = AppConfig.uploading;
+  static const String saving = AppConfig.saving;
   
   // Empty State Messages
-  static const String noOrders = 'No orders found.';
-  static const String noProducts = 'No products found.';
-  static const String noAddresses = 'No addresses found.';
-  static const String noFavorites = 'No favorites found.';
-  static const String noSearchResults = 'No search results found.';
+  static const String noOrders = AppConfig.noOrders;
+  static const String noProducts = AppConfig.noProducts;
+  static const String noAddresses = AppConfig.noAddresses;
+  static const String noFavorites = AppConfig.noFavorites;
+  static const String noSearchResults = AppConfig.noSearchResults;
   
   // Map Constants
-  static const double defaultLatitude = 27.7172;
-  static const double defaultLongitude = 85.3240;
-  static const double defaultZoom = 15.0;
-  static const double maxZoom = 20.0;
-  static const double minZoom = 10.0;
+  static const double defaultLatitude = AppConfig.defaultLatitude;
+  static const double defaultLongitude = AppConfig.defaultLongitude;
+  static const double defaultZoom = AppConfig.defaultZoom;
+  static const double maxZoom = AppConfig.maxZoom;
+  static const double minZoom = AppConfig.minZoom;
   
   // Animation Durations
-  static const Duration shortAnimation = Duration(milliseconds: 200);
-  static const Duration mediumAnimation = Duration(milliseconds: 300);
-  static const Duration longAnimation = Duration(milliseconds: 500);
+  static const Duration shortAnimation = AppConfig.shortAnimation;
+  static const Duration mediumAnimation = AppConfig.mediumAnimation;
+  static const Duration longAnimation = AppConfig.longAnimation;
   
   // Debounce Delay
-  static const Duration searchDebounce = Duration(milliseconds: 500);
-  static const Duration scrollDebounce = Duration(milliseconds: 100);
+  static const Duration searchDebounce = AppConfig.searchDebounce;
+  static const Duration scrollDebounce = AppConfig.scrollDebounce;
   
   // Refresh Intervals
-  static const Duration orderRefreshInterval = Duration(seconds: 30);
-  static const Duration locationRefreshInterval = Duration(seconds: 10);
+  static const Duration orderRefreshInterval = AppConfig.orderRefreshInterval;
+  static const Duration locationRefreshInterval = AppConfig.locationRefreshInterval;
   
   // Storage Keys
-  static const String tokenKey = 'auth_token';
-  static const String userKey = 'user_data';
-  static const String themeKey = 'theme_mode';
-  static const String languageKey = 'language';
-  static const String locationKey = 'last_location';
-  static const String cartKey = 'cart_data';
+  static const String tokenKey = AppConfig.tokenKey;
+  static const String userKey = AppConfig.userKey;
+  static const String themeKey = AppConfig.themeKey;
+  static const String languageKey = AppConfig.languageKey;
+  static const String locationKey = AppConfig.locationKey;
+  static const String cartKey = AppConfig.cartKey;
   
   // Notification Channels
-  static const String orderChannel = 'order_notifications';
-  static const String generalChannel = 'general_notifications';
-  static const String promotionChannel = 'promotion_notifications';
+  static const String orderChannel = AppConfig.orderChannel;
+  static const String generalChannel = AppConfig.generalChannel;
+  static const String promotionChannel = AppConfig.promotionChannel;
   
   // Notification IDs
-  static const int orderStatusNotificationId = 1001;
-  static const int newOrderNotificationId = 1002;
-  static const int deliveryNotificationId = 1003;
-  static const int promotionNotificationId = 1004;
+  static const int orderStatusNotificationId = AppConfig.orderStatusNotificationId;
+  static const int newOrderNotificationId = AppConfig.newOrderNotificationId;
+  static const int deliveryNotificationId = AppConfig.deliveryNotificationId;
+  static const int promotionNotificationId = AppConfig.promotionNotificationId;
 } 

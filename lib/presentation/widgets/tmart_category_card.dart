@@ -61,12 +61,13 @@ class TMartCategoryCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(0.06),
               blurRadius: 8,
               offset: const Offset(0, 2),
+              spreadRadius: 0,
             ),
           ],
         ),
@@ -74,17 +75,22 @@ class TMartCategoryCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 50,
-              height: 50,
+              width: 48,
+              height: 48,
+              margin: const EdgeInsets.only(top: 8),
               decoration: BoxDecoration(
-                color: _getCategoryColor(category['color']).withOpacity(0.1),
+                color: _getCategoryColor(category['color']).withOpacity(0.15),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _getCategoryColor(category['color']).withOpacity(0.3),
+                  width: 1,
+                ),
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(11),
                 child: Image.network(
                   category['imageUrl'] ?? '',
-                  fit: BoxFit.contain,
+                  fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Icon(
                     Icons.category,
                     color: _getCategoryColor(category['color']),
@@ -94,28 +100,40 @@ class TMartCategoryCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              category['displayName'] ?? category['name'] ?? '',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: Text(
+                category['displayName'] ?? category['name'] ?? '',
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
             if (category['productCount'] != null && category['productCount'] > 0) ...[
               const SizedBox(height: 2),
-              Text(
-                '${category['productCount']} items',
-                style: GoogleFonts.poppins(
-                  fontSize: 10,
-                  color: Colors.grey[600],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: _getCategoryColor(category['color']).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                textAlign: TextAlign.center,
+                child: Text(
+                  '${category['productCount']}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w500,
+                    color: _getCategoryColor(category['color']),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ),
             ],
+            const SizedBox(height: 8),
           ],
         ),
       ),

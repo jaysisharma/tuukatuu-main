@@ -4,7 +4,10 @@ const { calculateDistance, validateCoordinates } = require('../utils/locationUti
 // Get all addresses for a user
 exports.findAddressesForUser = async (userId) => {
   try {
-    return await Address.find({ userId }).sort({ isDefault: -1, createdAt: -1 });
+    console.log('🔍 Backend Service: Finding addresses for user:', userId);
+    const addresses = await Address.find({ userId }).sort({ isDefault: -1, createdAt: -1 });
+    console.log('🔍 Backend Service: Found ${addresses.length} addresses');
+    return addresses;
   } catch (error) {
     console.error('Error finding addresses for user:', error);
     throw new Error('Failed to fetch addresses');

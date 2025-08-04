@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tuukatuu/core/config/routes.dart';
+import '../models/product.dart';
 
 import '../widgets/cached_image.dart';
 
@@ -740,7 +741,37 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
       curve: Curves.easeInOut,
     ));
     
-    return Container(
+    return GestureDetector(
+      onTap: () {
+        print('Product card tapped: ${item['name']}');
+        try {
+          // Convert the item to a Product object and navigate to product details
+          final product = Product(
+            id: item['id'] ?? item['name']!,
+            name: item['name']!,
+            price: double.tryParse(item['price']!.replaceAll('Rs ', '').replaceAll(',', '')) ?? 0.0,
+            imageUrl: item['image']!,
+            category: item['category'] ?? 'Food',
+            rating: 4.5,
+            reviews: 120,
+            isAvailable: true,
+            deliveryFee: 0.0,
+            description: item['description']!,
+            images: [item['image']!],
+            vendorId: widget.store['id'] ?? 'store1',
+          );
+          
+          print('Navigating to product details with product: ${product.name}');
+          Navigator.pushNamed(
+            context,
+            AppRoutes.productDetails,
+            arguments: {'product': product},
+          );
+        } catch (e) {
+          print('Error navigating to product details: $e');
+        }
+      },
+      child: Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -928,7 +959,9 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
           ),
         ],
       ),
+    )
     );
+
   }
 
   Widget _buildFullMenu() {
