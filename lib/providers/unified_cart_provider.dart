@@ -111,6 +111,10 @@ class UnifiedCartProvider extends ChangeNotifier {
 
   // Add item to cart
   void addItem(CartItem item) {
+    print('🛒 Adding item to cart: ${item.name} (ID: ${item.id}, Type: ${item.type})');
+    print('🛒 Item vendorId: ${item.vendorId}');
+    print('🛒 Current cart items count: ${_items.length}');
+    
     final existingIndex = _items.indexWhere((existingItem) => 
       existingItem.id == item.id && existingItem.type == item.type
     );
@@ -122,13 +126,16 @@ class UnifiedCartProvider extends ChangeNotifier {
         quantity: existingItem.quantity + item.quantity,
         notes: item.notes ?? existingItem.notes,
       );
+      print('🛒 Updated existing item quantity to: ${_items[existingIndex].quantity}');
     } else {
       // Add new item
       _items.add(item);
+      print('🛒 Added new item. Total items now: ${_items.length}');
     }
     
     _triggerAnimation();
     notifyListeners();
+    print('🛒 Cart updated. Total items: ${_items.length}');
   }
 
   // Add store item (convenience method)
@@ -144,14 +151,27 @@ class UnifiedCartProvider extends ChangeNotifier {
     Map<String, dynamic>? additionalData,
     Store? store,
   }) {
+    print('🛒 addStoreItem called with:');
+    print('  - id: $id');
+    print('  - name: $name');
+    print('  - price: $price');
+    print('  - quantity: $quantity');
+    print('  - vendorId: $vendorId');
+    print('  - store: ${store?.name}');
+    print('  - store.id: ${store?.id}');
+    
+    // Use store.id as fallback if vendorId is null
+    final finalVendorId = vendorId ?? store?.id;
+    print('  - Final vendorId: $finalVendorId');
+    
     addItem(CartItem(
       id: id,
       name: name,
       price: price,
       quantity: quantity,
       image: image,
-      vendorId: vendorId,
-      vendorName: vendorName,
+      vendorId: finalVendorId,
+      vendorName: vendorName ?? store?.name,
       type: CartItemType.store,
       notes: notes,
       additionalData: additionalData,
@@ -230,6 +250,42 @@ class UnifiedCartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Clear items by vendor/store
+  void clearItemsByVendor(String vendorId) {
+    print('🛒 Clearing items for vendor: $vendorId');
+    print('  - Items before clearing: ${_items.length}');
+    print('  - All items in cart:');
+    for (final item in _items) {
+      String? itemVendorId;
+      if (item.vendorId is Map) {
+        itemVendorId = (item.vendorId as Map)['_id']?.toString();
+      } else {
+        itemVendorId = item.vendorId?.toString();
+      }
+      print('    * ${item.name}: vendorId=$itemVendorId, type=${item.type.name}');
+    }
+    
+    _items.removeWhere((item) {
+      String? itemVendorId;
+      if (item.vendorId is Map) {
+        itemVendorId = (item.vendorId as Map)['_id']?.toString();
+      } else {
+        itemVendorId = item.vendorId?.toString();
+      }
+      
+      final shouldRemove = itemVendorId == vendorId;
+      if (shouldRemove) {
+        print('    * Removing item: ${item.name} (vendorId: $itemVendorId)');
+      } else {
+        print('    * Keeping item: ${item.name} (vendorId: $itemVendorId != $vendorId)');
+      }
+      return shouldRemove;
+    });
+    
+    print('  - Items after clearing: ${_items.length}');
+    notifyListeners();
+  }
+
   // Clear all items
   void clearCart() {
     _items.clear();
@@ -246,12 +302,35 @@ class UnifiedCartProvider extends ChangeNotifier {
     final storeItems = getItemsByType(CartItemType.store);
     final grouped = <String, List<CartItem>>{};
     
+    print('🛒 getStoreItemsByVendor Debug:');
+    print('  - Store items count: ${storeItems.length}');
+    
     for (final item in storeItems) {
-      final vendorId = item.vendorId ?? 'unknown';
+      print('  - Processing item: ${item.name}');
+      print('    * Item vendorId type: ${item.vendorId.runtimeType}');
+      print('    * Item vendorId value: ${item.vendorId}');
+      
+      String vendorId;
+      if (item.vendorId is Map) {
+        // If vendorId is a Map, extract the _id field
+        vendorId = (item.vendorId as Map)['_id']?.toString() ?? 'unknown';
+        print('    * Extracted vendorId from Map: $vendorId');
+      } else {
+        vendorId = item.vendorId?.toString() ?? 'unknown';
+        print('    * Using vendorId as string: $vendorId');
+      }
+      
       if (!grouped.containsKey(vendorId)) {
         grouped[vendorId] = [];
+        print('    * Created new group for vendorId: $vendorId');
       }
       grouped[vendorId]!.add(item);
+      print('    * Added item to group: $vendorId');
+    }
+    
+    print('  - Final grouped items:');
+    for (final entry in grouped.entries) {
+      print('    * Vendor ${entry.key}: ${entry.value.length} items');
     }
     
     return grouped;
@@ -267,18 +346,72 @@ class UnifiedCartProvider extends ChangeNotifier {
       if (item.store != null && !storeIds.contains(item.store!.id)) {
         storeIds.add(item.store!.id);
         stores.add(item.store!);
+      } else if (item.store == null && item.vendorId != null) {
+        // Create a default store for items without store information
+        final defaultStore = Store(
+          id: item.vendorId ?? 'default',
+          name: item.vendorName ?? 'Store',
+          description: 'Store for ${item.name}',
+          image: item.image,
+          banner: item.image,
+          address: 'Store Address',
+          phone: 'Store Phone',
+          email: 'store@example.com',
+          rating: 4.0,
+          reviews: 100,
+          isFeatured: true,
+          isActive: true,
+          deliveryTime: '30-45 min',
+          minimumOrder: 0.0,
+          deliveryFee: 0.0,
+          categories: ['General'],
+        );
+        if (!storeIds.contains(defaultStore.id)) {
+          storeIds.add(defaultStore.id);
+          stores.add(defaultStore);
+        }
       }
     }
     
     return stores;
   }
 
+  // Create a default store for items without store information
+  Store _createDefaultStore(CartItem item) {
+    return Store(
+      id: item.vendorId ?? 'default',
+      name: item.vendorName ?? 'Store',
+      description: 'Store for ${item.name}',
+      image: item.image,
+      banner: item.image,
+      address: 'Store Address',
+      phone: 'Store Phone',
+      email: 'store@example.com',
+      rating: 4.0,
+      reviews: 100,
+      isFeatured: true,
+      isActive: true,
+      deliveryTime: '30-45 min',
+      minimumOrder: 0.0,
+      deliveryFee: 0.0,
+      categories: ['General'],
+    );
+  }
+
   // Get items for a specific store
   List<CartItem> getItemsForStore(String storeId) {
-    return _items.where((item) => 
-      item.type == CartItemType.store && 
-      item.vendorId == storeId
-    ).toList();
+    return _items.where((item) {
+      if (item.type != CartItemType.store) return false;
+      
+      String? itemVendorId;
+      if (item.vendorId is Map) {
+        itemVendorId = (item.vendorId as Map)['_id']?.toString();
+      } else {
+        itemVendorId = item.vendorId?.toString();
+      }
+      
+      return itemVendorId == storeId;
+    }).toList();
   }
 
   // Get total amount for a specific store
@@ -290,7 +423,20 @@ class UnifiedCartProvider extends ChangeNotifier {
   // Check if cart has multiple stores
   bool get hasMultipleStores {
     final storeItems = getItemsByType(CartItemType.store);
-    final vendorIds = storeItems.map((item) => item.vendorId).where((id) => id != null).toSet();
+    final vendorIds = <String>{};
+    
+    for (final item in storeItems) {
+      String? vendorId;
+      if (item.vendorId is Map) {
+        vendorId = (item.vendorId as Map)['_id']?.toString();
+      } else {
+        vendorId = item.vendorId?.toString();
+      }
+      if (vendorId != null) {
+        vendorIds.add(vendorId);
+      }
+    }
+    
     return vendorIds.length > 1;
   }
 
@@ -314,19 +460,28 @@ class UnifiedCartProvider extends ChangeNotifier {
 
   // Convert to order format
   List<Map<String, dynamic>> getOrderItems() {
-    return _items.map((item) => {
-      'id': item.id,
-      'product': item.id,
-      'quantity': item.quantity,
-      'price': item.price,
-      'name': item.name,
-      'image': item.image,
-      'type': item.type.name,
-      'notes': item.notes,
-      'unit': 'piece',
-      'orderType': item.type == CartItemType.tmart ? 'tmart' : 'regular',
-      'vendorId': item.vendorId,
-      'vendorName': item.vendorName,
+    return _items.map((item) {
+      String? vendorId;
+      if (item.vendorId is Map) {
+        vendorId = (item.vendorId as Map)['_id']?.toString();
+      } else {
+        vendorId = item.vendorId?.toString();
+      }
+      
+      return {
+        'id': item.id,
+        'product': item.id,
+        'quantity': item.quantity,
+        'price': item.price,
+        'name': item.name,
+        'image': item.image,
+        'type': item.type.name,
+        'notes': item.notes,
+        'unit': 'piece',
+        'orderType': item.type == CartItemType.tmart ? 'tmart' : 'regular',
+        'vendorId': vendorId,
+        'vendorName': item.vendorName,
+      };
     }).toList();
   }
 
@@ -373,5 +528,45 @@ class UnifiedCartProvider extends ChangeNotifier {
     }
     
     notifyListeners();
+  }
+
+  // Get store items with proper store information
+  Map<Store, List<CartItem>> getStoreItemsWithStores() {
+    final storeItems = getItemsByType(CartItemType.store);
+    final grouped = <Store, List<CartItem>>{};
+    
+    for (final item in storeItems) {
+      Store store;
+      if (item.store != null) {
+        store = item.store!;
+      } else {
+        // Create a better default store using vendor information
+        store = Store(
+          id: item.vendorId ?? 'default',
+          name: item.vendorName ?? 'Store',
+          description: 'Store for ${item.name}',
+          image: item.image,
+          banner: item.image,
+          address: 'Store Address',
+          phone: 'Store Phone',
+          email: 'store@example.com',
+          rating: 4.0,
+          reviews: 100,
+          isFeatured: true,
+          isActive: true,
+          deliveryTime: '30-45 min',
+          minimumOrder: 0.0,
+          deliveryFee: 0.0,
+          categories: ['General'],
+        );
+      }
+      
+      if (!grouped.containsKey(store)) {
+        grouped[store] = [];
+      }
+      grouped[store]!.add(item);
+    }
+    
+    return grouped;
   }
 } 

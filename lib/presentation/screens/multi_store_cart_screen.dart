@@ -18,11 +18,15 @@ class MultiStoreCartScreen extends StatelessWidget {
           Consumer<UnifiedCartProvider>(
             builder: (context, cartProvider, child) {
               if (cartProvider.items.isNotEmpty) {
-                return TextButton(
+                return TextButton.icon(
                   onPressed: () {
                     _showClearCartDialog(context, cartProvider);
                   },
-                  child: const Text('Clear All'),
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  label: const Text(
+                    'Clear All',
+                    style: TextStyle(color: Colors.red),
+                  ),
                 );
               }
               return const SizedBox.shrink();
@@ -32,22 +36,48 @@ class MultiStoreCartScreen extends StatelessWidget {
       ),
       body: Consumer<UnifiedCartProvider>(
         builder: (context, cartProvider, child) {
+          print('🛒 Multi Cart - Screen Build:');
+          print('  - Total cart items: ${cartProvider.items.length}');
+          print('  - Cart items: ${cartProvider.items.map((item) => '${item.name} (${item.quantity})').join(', ')}');
+          
           if (cartProvider.items.isEmpty) {
             return _buildEmptyCart(context);
           }
 
           final stores = cartProvider.getUniqueStores();
           final storeItemsByVendor = cartProvider.getStoreItemsByVendor();
+          final storeItemsWithStores = cartProvider.getStoreItemsWithStores();
           final tmartItems = cartProvider.getItemsByType(CartItemType.tmart);
+          
+          print('  - Unique stores: ${stores.length}');
+          print('  - Store items by vendor: ${storeItemsByVendor.keys.length} vendors');
+          print('  - Store items with stores: ${storeItemsWithStores.keys.length} stores');
+          print('  - T-Mart items: ${tmartItems.length}');
+          
+          for (final store in stores) {
+            print('    * Store: ${store.name} (${store.id})');
+            final storeItems = storeItemsWithStores[store] ?? [];
+            print('    * Store items: ${storeItems.length}');
+            for (final item in storeItems) {
+              print('      - ${item.name}: ${item.quantity}x Rs${item.price}');
+            }
+          }
+          
+          if (tmartItems.isNotEmpty) {
+            print('    * T-Mart items: ${tmartItems.length}');
+            for (final item in tmartItems) {
+              print('      - ${item.name}: ${item.quantity}x Rs${item.price}');
+            }
+          }
 
           return Column(
             children: [
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   children: [
                     // Store items
-                    if (stores.isNotEmpty) ...[
+                    if (storeItemsWithStores.isNotEmpty) ...[
                       const Text(
                         'Store Orders',
                         style: TextStyle(
@@ -56,13 +86,13 @@ class MultiStoreCartScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      ...stores.map((store) => _buildStoreSection(
+                      ...storeItemsWithStores.entries.map((entry) => _buildStoreSection(
                         context,
-                        store,
-                        storeItemsByVendor[store.id] ?? [],
+                        entry.key,
+                        entry.value,
                         cartProvider,
                       )),
-                      const SizedBox(height: 24),
+                      if (tmartItems.isNotEmpty) const SizedBox(height: 24),
                     ],
                     // Fast Delivery items (T-Mart)
                     if (tmartItems.isNotEmpty) ...[
@@ -79,8 +109,6 @@ class MultiStoreCartScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              // Bottom total and checkout
-              _buildBottomSection(context, cartProvider),
             ],
           );
         },
@@ -89,38 +117,53 @@ class MultiStoreCartScreen extends StatelessWidget {
   }
 
   Widget _buildEmptyCart(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.shopping_cart_outlined,
-            size: 80,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Your cart is empty',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[600],
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.shopping_cart_outlined,
+              size: 100,
+              color: theme.disabledColor.withOpacity(0.5),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Add some products to get started',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[500],
+            const SizedBox(height: 24),
+            Text(
+              'Your cart is empty',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.textTheme.bodyLarge?.color,
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () => Navigator.pushNamed(context, AppRoutes.home),
-            child: const Text('Start Shopping'),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              'Add some delicious food to get started',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.disabledColor,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 40),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pushNamed(context, AppRoutes.home),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Start Shopping',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -132,21 +175,15 @@ class MultiStoreCartScreen extends StatelessWidget {
     UnifiedCartProvider cartProvider,
   ) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final totalAmount = cartProvider.getStoreTotal(store.id);
+    
+    // Calculate total amount from the items directly
+    final totalAmount = items.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 20),
+      elevation: 4,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: isDark ? Colors.black.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         children: [
@@ -154,18 +191,17 @@ class MultiStoreCartScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.1),
+              color: theme.primaryColor.withOpacity(0.05),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: Row(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                   child: CachedImage(
                     imageUrl: store.banner.isNotEmpty ? store.banner : store.image,
                     width: 60,
-                    height: 45,
-                    fit: BoxFit.cover,
+                    height: 60,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -176,74 +212,97 @@ class MultiStoreCartScreen extends StatelessWidget {
                       Text(
                         store.name,
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.star,
-                            size: 14,
-                            color: Colors.amber[600],
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${store.rating} (${store.reviews})',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? Colors.grey[400] : Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            store.deliveryTime,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? Colors.grey[400] : Colors.grey[600],
-                            ),
-                          ),
-                        ],
+                      Text(
+                        '${items.length} items • ${store.deliveryTime}',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),
                 ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Rs ${totalAmount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                    Text(
+                      'Total',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Items count display
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.shopping_basket,
+                  size: 16,
+                  color: theme.disabledColor,
+                ),
+                const SizedBox(width: 8),
                 Text(
-                  'Rs ${totalAmount.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
+                  '${items.length} item${items.length == 1 ? '' : 's'}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.disabledColor,
                   ),
                 ),
               ],
             ),
           ),
-          // Items list
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return _buildCartItem(context, item, cartProvider);
-            },
-          ),
           // Store checkout button
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 onPressed: () => _checkoutStore(context, store, items, cartProvider),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: theme.primaryColor,
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
+                  elevation: 4,
                 ),
-                child: Text('Checkout ${store.name} • Rs ${totalAmount.toStringAsFixed(2)}'),
+                label: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Checkout from ${store.name}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    
+                  ],
+                ),
               ),
             ),
           ),
@@ -258,23 +317,13 @@ class MultiStoreCartScreen extends StatelessWidget {
     UnifiedCartProvider cartProvider,
   ) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final totalAmount = cartProvider.tmartTotalAmount;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 20),
+      elevation: 4,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: theme.brightness == Brightness.dark 
-                ? Colors.black.withOpacity(0.1) 
-                : Colors.grey.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         children: [
@@ -288,77 +337,102 @@ class MultiStoreCartScreen extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 60,
-                  height: 45,
+                  width: 70,
+                  height: 50,
                   decoration: BoxDecoration(
                     color: Colors.orange,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
                     Icons.local_grocery_store,
                     color: Colors.white,
-                    size: 24,
+                    size: 28,
                   ),
                 ),
-                const SizedBox(width: 12),
-                const Expanded(
+                const SizedBox(width: 16),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'T-Mart Express',
-                        style: TextStyle(
-                          fontSize: 16,
+                        style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
                         '10-20 min delivery',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.disabledColor,
                         ),
                       ),
                     ],
                   ),
                 ),
+              ],
+            ),
+          ),
+          // Items count display
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.shopping_basket,
+                  size: 16,
+                  color: theme.disabledColor,
+                ),
+                const SizedBox(width: 8),
                 Text(
-                  'Rs ${totalAmount.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
+                  '${items.length} item${items.length == 1 ? '' : 's'}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.disabledColor,
                   ),
                 ),
               ],
             ),
           ),
-          // Items list
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return _buildCartItem(context, item, cartProvider);
-            },
-          ),
           // T-Mart checkout button
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 onPressed: () => _checkoutTmart(context, items, cartProvider),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
+                  elevation: 4,
                 ),
-                child: Text('Checkout T-Mart • Rs ${totalAmount.toStringAsFixed(2)}'),
+                icon: const Icon(Icons.local_grocery_store, size: 20),
+                label: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Checkout from T-Mart',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(
+                      'Rs ${totalAmount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -367,175 +441,7 @@ class MultiStoreCartScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCartItem(
-    BuildContext context,
-    CartItem item,
-    UnifiedCartProvider cartProvider,
-  ) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: CachedImage(
-              imageUrl: item.image,
-              width: 60,
-              height: 60,
-              fit: BoxFit.cover,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Rs ${item.price}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            children: [
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () {
-                      if (item.quantity > 1) {
-                        cartProvider.updateQuantity(item.id, item.type, item.quantity - 1);
-                      } else {
-                        cartProvider.removeItem(item.id, item.type);
-                      }
-                    },
-                    icon: const Icon(Icons.remove, size: 18),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                  Text(
-                    '${item.quantity}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      cartProvider.updateQuantity(item.id, item.type, item.quantity + 1);
-                    },
-                    icon: const Icon(Icons.add, size: 18),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-              Text(
-                'Rs ${(item.price * item.quantity).toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? Colors.grey[400] : Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomSection(
-    BuildContext context,
-    UnifiedCartProvider cartProvider,
-  ) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final totalAmount = cartProvider.totalAmount;
-    final itemCount = cartProvider.itemCount;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: theme.brightness == Brightness.dark
-                ? Colors.black.withOpacity(0.2)
-                : Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, -1),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Total ($itemCount items)',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark ? Colors.grey[400] : Colors.grey[600],
-                    ),
-                  ),
-                  Text(
-                    'Rs ${totalAmount.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(
-              width: 200,
-              child: ElevatedButton(
-                onPressed: () => _checkoutAll(context, cartProvider),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Checkout All'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   void _checkoutStore(
     BuildContext context,
@@ -543,27 +449,98 @@ class MultiStoreCartScreen extends StatelessWidget {
     List<CartItem> items,
     UnifiedCartProvider cartProvider,
   ) {
-    final orderItems = items.map((item) => {
-      'id': item.id,
-      'product': item.id,
-      'quantity': item.quantity,
-      'price': item.price,
-      'name': item.name,
-      'image': item.image,
-      'type': item.type.name,
-      'notes': item.notes,
-      'vendorId': item.vendorId,
-      'vendorName': item.vendorName,
-      'unit': 'piece',
-      'orderType': 'regular',
+    print('🛒 Multi Cart - Checkout Store Debug:');
+    print('  - Store ID: ${store.id}');
+    print('  - Store Name: ${store.name}');
+    print('  - Items count: ${items.length}');
+    print('  - Total cart items: ${cartProvider.items.length}');
+    
+    final orderItems = items.map((item) {
+      print('  - Processing item: ${item.name}');
+      print('    * Item ID: ${item.id}');
+      print('    * Item Price: ${item.price}');
+      print('    * Item Quantity: ${item.quantity}');
+      print('    * Item Type: ${item.type.name}');
+      print('    * Item Vendor ID: ${item.vendorId}');
+      print('    * Item Vendor Name: ${item.vendorName}');
+      
+      // Ensure vendorId is always set
+      final finalVendorId = item.vendorId ?? store.id;
+      final finalVendorName = item.vendorName ?? store.name;
+      
+      print('    * Final Vendor ID: $finalVendorId');
+      print('    * Final Vendor Name: $finalVendorName');
+      
+      return {
+        'id': item.id,
+        'product': item.id,
+        'quantity': item.quantity,
+        'price': item.price,
+        'name': item.name,
+        'image': item.image,
+        'type': item.type.name,
+        'notes': item.notes,
+        'vendorId': finalVendorId,
+        'vendorName': finalVendorName,
+        'unit': 'piece',
+        'orderType': 'regular',
+      };
     }).toList();
 
+    print('  - Order items created: ${orderItems.length}');
+    
+    // Ensure all items have valid vendor ID
+    final validatedOrderItems = orderItems.map((item) {
+      print('  - Validating item: ${item['name']}');
+      print('    * Original vendorId: ${item['vendorId']}');
+      
+      if (item['vendorId'] == null || item['vendorId'].toString().isEmpty) {
+        print('    * Fixing null vendorId - using store.id: ${store.id}');
+        return {
+          ...item,
+          'vendorId': store.id,
+          'vendorName': store.name,
+        };
+      }
+      print('    * VendorId is valid: ${item['vendorId']}');
+      return item;
+    }).toList();
+    
+    print('  - Final validated items count: ${validatedOrderItems.length}');
+    print('  - Final Vendor ID: ${validatedOrderItems.isNotEmpty ? validatedOrderItems.first['vendorId'] : 'No items'}');
+    print('  - Total amount: ${cartProvider.getStoreTotal(store.id)}');
+    
+    // Print final order items details
+    for (int i = 0; i < validatedOrderItems.length; i++) {
+      final item = validatedOrderItems[i];
+      print('  - Final Order Item ${i + 1}:');
+      print('    * ID: ${item['id']}');
+      print('    * Name: ${item['name']}');
+      print('    * Price: ${item['price']}');
+      print('    * Quantity: ${item['quantity']}');
+      print('    * Vendor ID: ${item['vendorId']}');
+      print('    * Vendor Name: ${item['vendorName']}');
+      print('    * Type: ${item['type']}');
+      print('    * Order Type: ${item['orderType']}');
+    }
+
+    print('  - About to navigate to CheckoutScreen:');
+    print('    * Total amount: ${cartProvider.getStoreTotal(store.id)}');
+    print('    * Cart items count: ${validatedOrderItems.length}');
+    print('    * First item vendorId: ${validatedOrderItems.isNotEmpty ? validatedOrderItems.first['vendorId'] : 'No items'}');
+    
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => CheckoutScreen(
           totalAmount: cartProvider.getStoreTotal(store.id),
-          cartItems: orderItems,
+          cartItems: validatedOrderItems,
+          vendorId: store.id, // Pass the store ID as vendorId
+          onOrderSuccess: () {
+            // This will be called after successful checkout
+            // The cart is already cleared in the checkout screen
+            print('🛒 Multi Cart - Order success callback called');
+          },
         ),
       ),
     );
@@ -574,75 +551,97 @@ class MultiStoreCartScreen extends StatelessWidget {
     List<CartItem> items,
     UnifiedCartProvider cartProvider,
   ) {
-    final orderItems = items.map((item) => {
-      'id': item.id,
-      'product': item.id,
-      'quantity': item.quantity,
-      'price': item.price,
-      'name': item.name,
-      'image': item.image,
-      'type': item.type.name,
-      'notes': item.notes,
-      'vendorId': item.vendorId,
-      'vendorName': item.vendorName,
-      'unit': 'piece',
-      'orderType': 'tmart',
+    print('🛒 Multi Cart - Checkout T-Mart Debug:');
+    print('  - T-Mart Items count: ${items.length}');
+    print('  - Total cart items: ${cartProvider.items.length}');
+    print('  - T-Mart Total Amount: ${cartProvider.tmartTotalAmount}');
+    
+    final orderItems = items.map((item) {
+      print('  - Processing T-Mart item: ${item.name}');
+      print('    * Item ID: ${item.id}');
+      print('    * Item Price: ${item.price}');
+      print('    * Item Quantity: ${item.quantity}');
+      print('    * Item Type: ${item.type.name}');
+      print('    * Item Vendor ID: ${item.vendorId}');
+      print('    * Item Vendor Name: ${item.vendorName}');
+      
+      // Ensure vendorId is always set for T-Mart items
+      final finalVendorId = item.vendorId ?? 'tmart';
+      final finalVendorName = item.vendorName ?? 'T-Mart';
+      
+      print('    * Final T-Mart Vendor ID: $finalVendorId');
+      print('    * Final T-Mart Vendor Name: $finalVendorName');
+      
+      return {
+        'id': item.id,
+        'product': item.id,
+        'quantity': item.quantity,
+        'price': item.price,
+        'name': item.name,
+        'image': item.image,
+        'type': item.type.name,
+        'notes': item.notes,
+        'vendorId': finalVendorId,
+        'vendorName': finalVendorName,
+        'unit': 'piece',
+        'orderType': 'tmart',
+      };
     }).toList();
 
+    print('  - T-Mart order items created: ${orderItems.length}');
+    
+    // Ensure all items have valid vendor ID
+    final validatedOrderItems = orderItems.map((item) {
+      print('  - Validating T-Mart item: ${item['name']}');
+      print('    * Original vendorId: ${item['vendorId']}');
+      
+      if (item['vendorId'] == null || item['vendorId'].toString().isEmpty) {
+        print('    * Fixing null vendorId - using "tmart"');
+        return {
+          ...item,
+          'vendorId': 'tmart',
+          'vendorName': 'T-Mart',
+        };
+      }
+      print('    * VendorId is valid: ${item['vendorId']}');
+      return item;
+    }).toList();
+    
+    print('  - Final validated T-Mart items count: ${validatedOrderItems.length}');
+    print('  - Final T-Mart Vendor ID: ${validatedOrderItems.isNotEmpty ? validatedOrderItems.first['vendorId'] : 'No items'}');
+    
+    // Print final T-Mart order items details
+    for (int i = 0; i < validatedOrderItems.length; i++) {
+      final item = validatedOrderItems[i];
+      print('  - Final T-Mart Order Item ${i + 1}:');
+      print('    * ID: ${item['id']}');
+      print('    * Name: ${item['name']}');
+      print('    * Price: ${item['price']}');
+      print('    * Quantity: ${item['quantity']}');
+      print('    * Vendor ID: ${item['vendorId']}');
+      print('    * Vendor Name: ${item['vendorName']}');
+      print('    * Type: ${item['type']}');
+      print('    * Order Type: ${item['orderType']}');
+    }
+
+    print('  - About to navigate to CheckoutScreen (T-Mart):');
+    print('    * Total amount: ${cartProvider.tmartTotalAmount}');
+    print('    * Cart items count: ${validatedOrderItems.length}');
+    print('    * First item vendorId: ${validatedOrderItems.isNotEmpty ? validatedOrderItems.first['vendorId'] : 'No items'}');
+    
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => CheckoutScreen(
           totalAmount: cartProvider.tmartTotalAmount,
-          cartItems: orderItems,
+          cartItems: validatedOrderItems,
           isTmartOrder: true,
-        ),
-      ),
-    );
-  }
-
-  void _checkoutAll(BuildContext context, UnifiedCartProvider cartProvider) {
-    final cartSummary = cartProvider.getCartSummary();
-    final hasMixedItems = cartSummary['hasMixedItems'] as bool;
-    
-    if (hasMixedItems) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Mixed Cart Detected'),
-          content: const Text(
-            'You have items from both stores and T-Mart. These will be processed as separate orders. Continue?'
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _proceedToCheckoutAll(context, cartProvider);
-              },
-              child: const Text('Continue'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      _proceedToCheckoutAll(context, cartProvider);
-    }
-  }
-
-  void _proceedToCheckoutAll(BuildContext context, UnifiedCartProvider cartProvider) {
-    final orderItems = cartProvider.getOrderItems();
-    final totalAmount = cartProvider.totalAmount;
-    
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CheckoutScreen(
-          totalAmount: totalAmount,
-          cartItems: orderItems,
+          vendorId: 'tmart', // Pass 'tmart' as vendorId for T-Mart orders
+          onOrderSuccess: () {
+            // This will be called after successful checkout
+            // The cart is already cleared in the checkout screen
+            print('🛒 Multi Cart - T-Mart order success callback called');
+          },
         ),
       ),
     );
@@ -673,4 +672,4 @@ class MultiStoreCartScreen extends StatelessWidget {
       ),
     );
   }
-} 
+}

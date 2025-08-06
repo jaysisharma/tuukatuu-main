@@ -15,6 +15,8 @@ class Product {
   final String vendorId;
   final String? dealTag;
   final String? dealExpiresAt;
+  // Vendor information
+  final Map<String, dynamic>? vendor;
 
   const Product({
     required this.id,
@@ -33,7 +35,32 @@ class Product {
     this.unit = '1 piece',
     this.dealTag,
     this.dealExpiresAt,
+    this.vendor,
   });
+
+  // Get vendor name from populated vendor data
+  String get vendorName {
+    if (vendor != null && vendor!['storeName'] != null) {
+      return vendor!['storeName'];
+    }
+    return category; // Fallback to category if no vendor name
+  }
+
+  // Get vendor image from populated vendor data
+  String get vendorImage {
+    if (vendor != null && vendor!['storeImage'] != null) {
+      return vendor!['storeImage'];
+    }
+    return imageUrl; // Fallback to product image
+  }
+
+  // Get vendor description from populated vendor data
+  String get vendorDescription {
+    if (vendor != null && vendor!['storeDescription'] != null) {
+      return vendor!['storeDescription'];
+    }
+    return 'Store for $category products';
+  }
 
   static List<Product> dummyProducts = [
     Product(
@@ -124,23 +151,46 @@ class Product {
   ];
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    // Handle populated vendorId field
+    Map<String, dynamic>? vendorData;
+    if (json['vendorId'] is Map<String, dynamic>) {
+      vendorData = json['vendorId'] as Map<String, dynamic>;
+    } else if (json['vendor'] is Map<String, dynamic>) {
+      vendorData = json['vendor'] as Map<String, dynamic>;
+    }
+
+    // Get the main image URL
+    final mainImageUrl = json['imageUrl'] ?? json['image'] ?? '';
+    
+    // Get images array and ensure main image is included
+    List<String> images = [];
+    if (json['images'] is List) {
+      images = (json['images'] as List).map((e) => e.toString()).toList();
+    }
+    
+    // If images array is empty or doesn't contain the main image, add it
+    if (mainImageUrl.isNotEmpty && (images.isEmpty || !images.contains(mainImageUrl))) {
+      images.insert(0, mainImageUrl);
+    }
+
     return Product(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
       name: json['name'] ?? '',
       price: (json['price'] is int) ? (json['price'] as int).toDouble() : (json['price'] ?? 0.0),
-      imageUrl: json['imageUrl'] ?? json['image'] ?? '',
+      imageUrl: mainImageUrl,
       category: json['category'] ?? '',
       rating: (json['rating'] is int) ? (json['rating'] as int).toDouble() : (json['rating'] ?? 0.0),
       reviews: json['reviews'] ?? 0,
       isAvailable: json['isAvailable'] ?? true,
       deliveryFee: (json['deliveryFee'] is int) ? (json['deliveryFee'] as int).toDouble() : (json['deliveryFee'] ?? 0.0),
       description: json['description'] ?? '',
-      images: (json['images'] as List?)?.map((e) => e.toString()).toList() ?? [],
-      vendorId: json['vendorId']?.toString() ?? '',
+      images: images,
+      vendorId: vendorData?['_id']?.toString() ?? json['vendorId']?.toString() ?? '',
       deliveryTime: json['deliveryTime']?.toString() ?? '10 mins',
       unit: json['unit']?.toString() ?? '1 piece',
       dealTag: json['dealTag'],
       dealExpiresAt: json['dealExpiresAt'],
+      vendor: vendorData,
     );
   }
 }

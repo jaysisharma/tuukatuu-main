@@ -27,9 +27,11 @@ import 'presentation/screens/notifications/notification_screen.dart';
 import 'screens/category_products_screen.dart';
 import 'presentation/screens/daily_essentials_page.dart';
 import 'presentation/screens/recently_viewed_page.dart';
+import 'presentation/screens/main_screen.dart';
 
 class AppRoutes {
   static const String home = '/';
+  static const String mainWithOrders = '/main-orders';
   static const String tMart = '/t-mart';
   static const String tmartCart = '/tmart-cart';
   static const String tmartProductDetail = '/tmart-product-detail';
@@ -45,6 +47,7 @@ class AppRoutes {
   static const String location = '/location';
   static const String cart = '/cart';
   static const String unifiedCart = '/unified-cart';
+  static const String multiStoreCart = '/multi-store-cart';
   static const String checkout = '/checkout';
   static const String categoryProducts = '/category-products';
   static const String login = '/login';
@@ -57,7 +60,9 @@ class AppRoutes {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
       case home:
-        return MaterialPageRoute(builder: (_) => const HomeScreen());
+        return MaterialPageRoute(builder: (_) => const MainScreen());
+      case mainWithOrders:
+        return MaterialPageRoute(builder: (_) => const MainScreen(initialTabIndex: 2));
       case tMart:
         return MaterialPageRoute(builder: (_) => const TMartCleanScreen());
       case tmartCart:
@@ -159,6 +164,8 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const LocationScreen());
       case cart:
         return MaterialPageRoute(builder: (_) => const TMartDedicatedCartScreen());
+      case multiStoreCart:
+        return MaterialPageRoute(builder: (_) => const MultiStoreCartScreen());
       case checkout:
         if (settings.arguments != null) {
           final args = settings.arguments as Map<String, dynamic>;

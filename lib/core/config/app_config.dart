@@ -1,6 +1,8 @@
 class AppConfig {
   // API Configuration
-  static const String serverIP = 'localhost';
+  // For development, use localhost. For production, use the remote server
+  static const bool isDevelopment = false; // Set to false for production
+  static const String serverIP = '13.203.210.247';
   static const int serverPort = 3000;
   static const String apiPath = '/api';
   

@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/product.dart';
+import '../../models/store.dart';
 import '../../providers/search_provider.dart';
-import '../../providers/cart_provider.dart';
+import '../../providers/unified_cart_provider.dart';
 import '../widgets/cached_image.dart';
 import '../widgets/filter_bottom_sheet.dart';
 import '../../services/api_service.dart';
 import 'dart:async';
 import '../../../core/config/routes.dart';
+import 'product_details_screen.dart';
 
 class SearchResultsScreen extends StatefulWidget {
   final String query;
@@ -32,18 +34,22 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
   late AnimationController _cartAnimationController;
   late Animation<double> _cartAnimation;
   bool _loading = false;
+  bool _loadingSimilar = false;
+  bool _loadingRecommendations = false;
   Timer? _debounce;
+
+  // Swiggy color scheme
+  static const Color swiggyOrange = Color(0xFFFC8019);
+  static const Color swiggyLight = Color(0xFFF8F9FA);
 
   @override
   void initState() {
     super.initState();
     _searchController.text = widget.query;
     _filteredProducts = widget.initialResults;
-    _loadSimilarAndRecommendedProducts();
-    // Initialize quantities to 0 for all products
-    for (var product in widget.initialResults) {
-      _quantities[product.id] = 0;
-    }
+    
+    // Initialize quantities from unified cart
+    _syncQuantitiesWithCart();
 
     // Initialize animation controller
     _cartAnimationController = AnimationController(
@@ -58,30 +64,156 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
       ),
     );
     _searchController.addListener(_onSearchChanged);
+    
+    // Load similar and recommended products after initialization
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSimilarAndRecommendedProducts();
+    });
   }
 
-  void _loadSimilarAndRecommendedProducts() {
-    // Get the category of the first result (if any)
-    final mainCategory = _filteredProducts.isNotEmpty ? _filteredProducts.first.category : null;
+  void _syncQuantitiesWithCart() {
+    final cartProvider = Provider.of<UnifiedCartProvider>(context, listen: false);
     
-    // Find similar products (same category, excluding current results)
-    _similarProducts = mainCategory != null
-        ? Product.dummyProducts
+    for (var product in _filteredProducts) {
+      final quantity = cartProvider.getItemQuantity(product.id, CartItemType.store);
+      _quantities[product.id] = quantity;
+    }
+  }
+
+  Future<void> _refreshSimilarAndRecommended() async {
+    print('🔄 Search Results: Refreshing similar and recommended products');
+    await _loadSimilarAndRecommendedProducts();
+  }
+
+  void _navigateToProductDetails(Product product) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductDetailsScreen(product: product),
+      ),
+    ).then((_) {
+      // Refresh quantities when returning from product details
+      _syncQuantitiesWithCart();
+    });
+  }
+
+  Future<void> _loadSimilarAndRecommendedProducts() async {
+    try {
+      print('🔍 Search Results: Loading similar and recommended products');
+      
+      // Get similar products based on the first result's category
+      if (_filteredProducts.isNotEmpty) {
+        setState(() {
+          _loadingSimilar = true;
+        });
+        
+        final firstProduct = _filteredProducts.first;
+        print('🔍 Search Results: Loading similar products for category: ${firstProduct.category}');
+        
+        try {
+          final similarProducts = await ApiService.getSimilarProducts(firstProduct.id, limit: 4);
+          if (similarProducts.isNotEmpty) {
+            setState(() {
+              _similarProducts = similarProducts;
+              _loadingSimilar = false;
+            });
+            print('✅ Search Results: Loaded ${similarProducts.length} similar products from API');
+          } else {
+            // Fallback to dummy products
+            _loadFallbackSimilarProducts(firstProduct.category);
+            setState(() {
+              _loadingSimilar = false;
+            });
+          }
+        } catch (e) {
+          print('❌ Search Results: Error loading similar products from API: $e');
+          _loadFallbackSimilarProducts(firstProduct.category);
+          setState(() {
+            _loadingSimilar = false;
+          });
+        }
+      } else {
+        setState(() {
+          _similarProducts = [];
+          _loadingSimilar = false;
+        });
+      }
+
+      // Get recommendations
+      setState(() {
+        _loadingRecommendations = true;
+      });
+      
+      try {
+        final recommendations = await ApiService.getRecommendations(limit: 4);
+        if (recommendations.isNotEmpty) {
+          setState(() {
+            _recommendations = recommendations;
+            _loadingRecommendations = false;
+          });
+          print('✅ Search Results: Loaded ${recommendations.length} recommendations from API');
+        } else {
+          // Fallback to dummy products
+          _loadFallbackRecommendations();
+          setState(() {
+            _loadingRecommendations = false;
+          });
+        }
+      } catch (e) {
+        print('❌ Search Results: Error loading recommendations from API: $e');
+        _loadFallbackRecommendations();
+        setState(() {
+          _loadingRecommendations = false;
+        });
+      }
+    } catch (e) {
+      print('❌ Search Results: Error in _loadSimilarAndRecommendedProducts: $e');
+      _loadFallbackSimilarProducts(null);
+      _loadFallbackRecommendations();
+      setState(() {
+        _loadingSimilar = false;
+        _loadingRecommendations = false;
+      });
+    }
+  }
+
+  void _loadFallbackSimilarProducts(String? category) {
+    if (category == null) {
+      setState(() {
+        _similarProducts = [];
+      });
+      return;
+    }
+
+    // Find similar products from dummy data (same category, excluding current results)
+    final fallbackSimilar = Product.dummyProducts
             .where((p) => 
-                p.category == mainCategory && 
+            p.category == category && 
                 !_filteredProducts.contains(p))
             .take(4)
-            .toList()
-        : [];
+        .toList();
 
-    // Get recommendations (different category, sorted by rating)
-    _recommendations = Product.dummyProducts
+    setState(() {
+      _similarProducts = fallbackSimilar;
+    });
+    print('✅ Search Results: Loaded ${fallbackSimilar.length} fallback similar products');
+  }
+
+  void _loadFallbackRecommendations() {
+    // Get recommendations from dummy data (different category, sorted by rating)
+    final fallbackRecommendations = Product.dummyProducts
         .where((p) => 
             !_filteredProducts.contains(p) && 
             !_similarProducts.contains(p))
         .toList()
       ..sort((a, b) => b.rating.compareTo(a.rating));
-    _recommendations = _recommendations.take(4).toList();
+    
+    final recommendations = fallbackRecommendations.take(4).toList();
+
+    setState(() {
+      _recommendations = recommendations;
+    });
+    print('✅ Search Results: Loaded ${recommendations.length} fallback recommendations');
   }
 
   @override
@@ -105,15 +237,20 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
       }
       setState(() { _loading = true; });
       try {
-        final data = await ApiService.get('/products?search=$query');
-        final products = (data['products'] as List)
-            .map((json) => Product.fromJson(json))
-            .toList();
+        print('🔍 Search Results: Searching for "$query"');
+        final products = await ApiService.searchProducts(query, limit: 20);
+        
         setState(() {
           _filteredProducts = products;
           _loading = false;
         });
+        
+        print('✅ Search Results: Found ${products.length} products for "$query"');
+        
+        // Reload similar and recommended products based on new results
+        _loadSimilarAndRecommendedProducts();
       } catch (e) {
+        print('❌ Search Results: Search error for "$query": $e');
         setState(() {
           _filteredProducts = [];
           _loading = false;
@@ -175,19 +312,80 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
   }
 
   void _updateQuantity(String productId, bool increment, Product product) {
-    final cartProvider = Provider.of<CartProvider>(context, listen: false);
+    final cartProvider = Provider.of<UnifiedCartProvider>(context, listen: false);
     
     setState(() {
       if (increment) {
         _quantities[productId] = (_quantities[productId] ?? 0) + 1;
-        cartProvider.addItem(product);
+        
+        // Add to unified cart as store item
+        cartProvider.addStoreItem(
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: 1,
+          image: product.imageUrl,
+          vendorId: product.vendorId,
+          vendorName: product.vendorName,
+          store: Store(
+            id: product.vendorId,
+            name: product.vendorName, // Use proper vendor name instead of category
+            description: product.vendorDescription,
+            image: product.vendorImage,
+            banner: product.vendorImage,
+            address: product.vendor?['storeAddress'] ?? 'Store Address',
+            phone: product.vendor?['phone'] ?? 'Store Phone',
+            email: product.vendor?['email'] ?? 'store@example.com',
+            rating: (product.vendor?['storeRating'] ?? product.rating).toDouble(),
+            reviews: product.vendor?['storeReviews'] ?? product.reviews,
+            isFeatured: product.vendor?['isFeatured'] ?? true,
+            isActive: true,
+            deliveryTime: '30-45 min',
+            minimumOrder: 0.0,
+            deliveryFee: product.deliveryFee,
+            categories: product.vendor?['storeCategories']?.cast<String>() ?? [product.category],
+          ),
+        );
+        
         _cartAnimationController.forward().then((_) {
           _cartAnimationController.reverse();
         });
+        
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${product.name} added to cart'),
+            backgroundColor: swiggyOrange,
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'View Cart',
+              textColor: Colors.white,
+              onPressed: () {
+                Navigator.pushNamed(context, '/multi-store-cart');
+              },
+            ),
+          ),
+        );
       } else {
         if ((_quantities[productId] ?? 0) > 0) {
           _quantities[productId] = _quantities[productId]! - 1;
-          cartProvider.updateQuantity(product.name, _quantities[productId]!);
+          
+          // Update quantity in unified cart
+          final existingItem = cartProvider.items.firstWhere(
+            (item) => item.id == product.id && item.type == CartItemType.store,
+            orElse: () => CartItem(
+              id: '',
+              name: '',
+              price: 0,
+              quantity: 0,
+              image: '',
+              type: CartItemType.store,
+            ),
+          );
+          
+          if (existingItem.id.isNotEmpty) {
+            cartProvider.updateQuantity(product.id, CartItemType.store, _quantities[productId]!);
+          }
         }
       }
     });
@@ -213,7 +411,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
       ),
       child: InkWell(
         onTap: () {
-          // TODO: Navigate to product details
+          // Navigate to product details screen
+          _navigateToProductDetails(product);
         },
         borderRadius: BorderRadius.circular(16),
         child: Column(
@@ -226,7 +425,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                   child: Stack(
                     children: [
-                      CachedImage(imageUrl: product.imageUrl, width: double.infinity, height: 140, fit: BoxFit.cover),
+                      CachedImage(
+                        imageUrl: product.imageUrl, 
+                        width: double.infinity, 
+                        height: 140, 
+                        fit: BoxFit.cover,
+                      ),
                       if (product.deliveryFee == 0)
                         Positioned(
                           top: 8,
@@ -259,7 +463,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
                   bottom: 8,
                   child: quantity == 0
                       ? Material(
-                          color: theme.colorScheme.primary,
+                          color: swiggyOrange,
                           borderRadius: BorderRadius.circular(8),
                           child: InkWell(
                             onTap: () => _updateQuantity(product.id, true, product),
@@ -282,7 +486,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
                         )
                       : Container(
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.primary,
+                            color: swiggyOrange,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
@@ -378,7 +582,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
                   Text(
                     'Rs ${product.price}',
                     style: TextStyle(
-                      color: theme.colorScheme.primary,
+                      color: swiggyOrange,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
@@ -397,7 +601,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final searchProvider = Provider.of<SearchProvider>(context);
-    final cartProvider = Provider.of<CartProvider>(context);
+    final cartProvider = Provider.of<UnifiedCartProvider>(context);
+
+    // Sync quantities when cart changes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncQuantitiesWithCart();
+    });
 
     return Scaffold(
       backgroundColor: isDark ? Colors.grey[900] : Colors.grey[100],
@@ -405,14 +614,14 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
         scale: _cartAnimation,
         child: FloatingActionButton(
           onPressed: () {
-            Navigator.pushNamed(context, AppRoutes.cart);
+            Navigator.pushNamed(context, '/multi-store-cart');
           },
-          backgroundColor: theme.colorScheme.primary,
+          backgroundColor: swiggyOrange,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
               const Icon(Icons.shopping_cart, color: Colors.white),
-              if (cartProvider.items.isNotEmpty)
+              if (cartProvider.itemCount > 0)
                 Positioned(
                   right: -8,
                   top: -8,
@@ -428,7 +637,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
                       minHeight: 20,
                     ),
                     child: Text(
-                      '${cartProvider.items.length}',
+                      '${cartProvider.itemCount}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -495,7 +704,22 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
             ),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text(
+                            'Searching for products...',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
                   : _filteredProducts.isEmpty
                   ? Center(
                       child: Column(
@@ -551,18 +775,45 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
                               );
                             },
                           ),
-                          if (_similarProducts.isNotEmpty) ...[
+                          if (_similarProducts.isNotEmpty || _loadingSimilar) ...[
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-                              child: Text(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
                                 'Similar Products',
                                 style: theme.textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
+                                  if (!_loadingSimilar)
+                                    Text(
+                                      '${_similarProducts.length} items',
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
+                            if (_loadingSimilar)
+                              const Padding(
+                                padding: EdgeInsets.all(32),
+                                child: Center(
+                                  child: Column(
+                                    children: [
+                                      CircularProgressIndicator(),
+                                      SizedBox(height: 8),
+                                      Text('Loading similar products...'),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            else
                             SizedBox(
-                              height: 280,
+                                height: 300,
                               child: ListView.builder(
                                 padding: const EdgeInsets.symmetric(horizontal: 16),
                                 scrollDirection: Axis.horizontal,
@@ -581,18 +832,45 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
                               ),
                             ),
                           ],
-                          if (_recommendations.isNotEmpty) ...[
+                          if (_recommendations.isNotEmpty || _loadingRecommendations) ...[
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-                              child: Text(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
                                 'You May Also Like',
                                 style: theme.textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
+                                  if (!_loadingRecommendations)
+                                    Text(
+                                      '${_recommendations.length} items',
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
+                            if (_loadingRecommendations)
+                              const Padding(
+                                padding: EdgeInsets.all(32),
+                                child: Center(
+                                  child: Column(
+                                    children: [
+                                      CircularProgressIndicator(),
+                                      SizedBox(height: 8),
+                                      Text('Loading recommendations...'),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            else
                             SizedBox(
-                              height: 280,
+                                height: 300,
                               child: ListView.builder(
                                 padding: const EdgeInsets.symmetric(horizontal: 16),
                                 scrollDirection: Axis.horizontal,

@@ -3,10 +3,12 @@ import 'package:tuukatuu/presentation/screens/product_details_screen.dart';
 import '../../../core/config/routes.dart';
 import '../../widgets/cached_image.dart';
 import 'package:provider/provider.dart';
-import 'package:tuukatuu/providers/cart_provider.dart';
+import 'package:tuukatuu/providers/unified_cart_provider.dart';
 import '../../services/api_service.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../models/product.dart';
+import '../../models/store.dart';
+import '../screens/multi_store_cart_screen.dart';
 
 class StoreDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> store;
@@ -198,16 +200,48 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    final cartProvider = Provider.of<CartProvider>(context, listen: false);
-                    cartProvider.insertRawItem(0, {
-                      'id': item['_id'] ?? item['id'],
-                      'name': item['name'] ?? '',
-                      'price': item['price'] ?? 0,
-                      'quantity': quantity,
-                      'notes': '',
-                      'image': item['imageUrl'] ?? '',
-                      'vendorId': item['vendorId'] ?? _normalizedStore['_id'],
-                    });
+                    final cartProvider = Provider.of<UnifiedCartProvider>(context, listen: false);
+                    
+                    // Extract vendor ID properly
+                    String? vendorId;
+                    
+                    // Handle vendorId which might be a Map or String
+                    if (item['vendorId'] != null) {
+                      if (item['vendorId'] is Map) {
+                        // If vendorId is a Map, extract the _id field
+                        vendorId = (item['vendorId'] as Map)['_id']?.toString();
+                      } else {
+                        vendorId = item['vendorId'].toString();
+                      }
+                    } else if (_normalizedStore['_id'] != null) {
+                      vendorId = _normalizedStore['_id'].toString();
+                    }
+                    
+                    // Print the data being added to cart
+                    print('🛒 Adding item to cart from store details:');
+                    print('  - Item ID: ${item['_id'] ?? item['id']}');
+                    print('  - Item Name: ${item['name'] ?? ''}');
+                    print('  - Item Price: ${item['price'] ?? 0}');
+                    print('  - Quantity: $quantity');
+                    print('  - Image URL: ${item['imageUrl'] ?? ''}');
+                    print('  - Vendor ID: $vendorId');
+                    print('  - Store Name: ${_normalizedStore['name'] ?? ''}');
+                    print('  - Store ID: ${_normalizedStore['_id'] ?? ''}');
+                    print('  - Cart items before adding: ${cartProvider.items.length}');
+                    
+                    cartProvider.addStoreItem(
+                      id: item['_id'] ?? item['id'],
+                      name: item['name'] ?? '',
+                      price: (item['price'] ?? 0).toDouble(),
+                      quantity: quantity,
+                      image: item['imageUrl'] ?? '',
+                      vendorId: vendorId,
+                      store: Store.fromJson(_normalizedStore),
+                    );
+                    
+                    print('  - Cart items after adding: ${cartProvider.items.length}');
+                    print('  - Total cart items: ${cartProvider.items.length}');
+                    
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -273,27 +307,42 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
       }
       
       // Use normalized store data
-      final vendorId = _normalizedStore['vendorId'];
+      final vendorId = _normalizedStore['vendorId'] ?? _normalizedStore['id'] ?? _normalizedStore['_id'];
       if (vendorId == null || vendorId.toString().isEmpty) {
-        throw Exception('No valid vendor ID found in store data');
+        print('⚠️ No valid vendor ID found in store data: ${_normalizedStore.keys}');
+        // Try to get products using store name as fallback
+        final storeName = _normalizedStore['storeName'] ?? _normalizedStore['name'];
+        if (storeName != null && storeName.toString().isNotEmpty) {
+          print('🔍 Trying to fetch products using store name: $storeName');
+          final products = await ApiService.getProductsByVendorName(storeName.toString());
+          setState(() {
+            _products = products;
+            _loadingProducts = false;
+          });
+          return;
+        } else {
+          throw Exception('No valid vendor ID or store name found in store data');
+        }
       }
       
-      print('🔍 Fetching products for store: ${_normalizedStore['name']} (vendorId: $vendorId)');
-      
+      print('🔍 Fetching products for vendor ID: $vendorId');
       final products = await ApiService.getProductsByVendor(vendorId.toString());
-      print('🔍 Received ${products.length} products for store');
       
-      // Debug: Print first few products to verify structure
-      if (products.isNotEmpty) {
-        print('🔍 First product structure: ${products.first}');
+      // If no products found, use mock products
+      if (products.isEmpty) {
+        print('⚠️ No products found for vendor $vendorId, using mock products');
+        // final mockProducts = _generateMockProducts();
+        setState(() {
+          // _products = mockProducts;
+          _loadingProducts = false;
+        });
+      } else {
+        setState(() {
+          _products = products;
+          _loadingProducts = false;
+        });
       }
-      
-      setState(() {
-        _products = products;
-        _loadingProducts = false;
-      });
     } catch (e) {
-      print('❌ Error fetching products: $e');
       setState(() {
         _loadingProducts = false;
         _errorProducts = e.toString();
@@ -303,14 +352,22 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
 
   @override
   Widget build(BuildContext context) {
-    final cartProvider = Provider.of<CartProvider>(context);
+    final cartProvider = Provider.of<UnifiedCartProvider>(context);
+    
+
+    
     return Scaffold(
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: cartProvider.items.isNotEmpty
           ? FloatingActionButton(
               onPressed: () {
-                Navigator.pushNamed(context, AppRoutes.cart);
+
+                
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const MultiStoreCartScreen()));
               },
               backgroundColor: Colors.orange,
+              elevation: 8,
+              heroTag: 'store_cart_fab',
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -551,6 +608,27 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
             Share.share('Check out $storeName on TuukaTuu! $storeUrl');
           },
         ),
+        Consumer<UnifiedCartProvider>(
+          builder: (context, cartProvider, child) {
+            return IconButton(
+              icon: Icon(
+                Icons.shopping_cart,
+                color: _isCollapsed ? Colors.black : Colors.white,
+              ),
+              onPressed: () {
+
+                // Navigator.pushNamed(context, '/multi-store-cart');
+                Navigator.push(context, MaterialPageRoute(builder: (context) => MultiStoreCartScreen()));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Cart has ${cartProvider.items.length} items'),
+                    backgroundColor: Colors.blue,
+                  ),
+                );
+              },
+            );
+          },
+        ),
         // Heart icon removed
       ],
       flexibleSpace: FlexibleSpaceBar(
@@ -727,22 +805,34 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
   }
 
   Widget _buildItemCard(Map<String, dynamic> item) {
-    final cartProvider = Provider.of<CartProvider>(context);
-    final String productId = item['_id'] ?? item['id'] ?? '';
-    final int quantity = cartProvider.items.firstWhere(
-      (e) => e['id'] == productId,
-      orElse: () => {},
-    )?['quantity'] ?? 0;
+    final String productId = item['_id']?.toString() ?? item['id']?.toString() ?? '';
+    
+    // Ensure we have a valid product ID
+    if (productId.isEmpty) {
+      // Product ID is empty
+    }
+    
+    return Consumer<UnifiedCartProvider>(
+      builder: (context, cartProvider, child) {
+        final int quantity = cartProvider.items.firstWhere(
+          (e) => e.id == productId && e.type == CartItemType.store,
+          orElse: () => CartItem(
+            id: '',
+            name: '',
+            price: 0,
+            quantity: 0,
+            image: '',
+            type: CartItemType.store,
+          ),
+        ).quantity;
     
     // Debug: Print item structure if there are issues
     if (item['name'] == null || item['price'] == null) {
-      print('⚠️ Product item missing required fields: $item');
+      // Product item missing required fields
     }
 
     return GestureDetector(
       onTap: () {
-        print('Product card tapped: ${item['name']}');
-        print('Item data: $item');
         try {
           // Convert the item to a Product object and navigate to product details
           final product = Product(
@@ -760,12 +850,9 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
             vendorId: item['vendorId']?.toString() ?? _normalizedStore['_id']?.toString() ?? 'store1',
           );
           
-          print('Navigating to product details with product: ${product.name}');
-          print('Route: ${AppRoutes.productDetails}');
-          print('Route constant value: "${AppRoutes.productDetails}"');
           Navigator.push(context, MaterialPageRoute(builder: (context) => ProductDetailsScreen(product: product)));
         } catch (e) {
-          print('Error navigating to product details: $e');
+          // Error navigating to product details
         }
       },
       child: Container(
@@ -805,15 +892,88 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: () {
-                            cartProvider.insertRawItem(0, {
-                              'id': productId,
-                              'name': item['name']?.toString() ?? 'Unnamed Product',
-                              'price': item['price'] ?? 0,
-                              'quantity': 1,
-                              'notes': '',
-                              'image': item['image'] ?? item['imageUrl'] ?? '',
-                              'vendorId': item['vendorId'] ?? _normalizedStore['_id'],
-                            });
+                            try {
+                              if (productId.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Error: Product ID is empty'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
+                              
+                              final store = Store.fromJson(_normalizedStore);
+                              
+                              // Handle price conversion properly
+                              double price;
+                              if (item['price'] is int) {
+                                price = (item['price'] as int).toDouble();
+                              } else if (item['price'] is double) {
+                                price = item['price'] as double;
+                              } else {
+                                price = double.tryParse(item['price']?.toString() ?? '0') ?? 0.0;
+                              }
+                              
+                              // Extract vendor ID properly
+                              String? vendorId;
+                              
+                              // Handle vendorId which might be a Map or String
+                              if (item['vendorId'] != null) {
+                                if (item['vendorId'] is Map) {
+                                  // If vendorId is a Map, extract the _id field
+                                  vendorId = (item['vendorId'] as Map)['_id']?.toString();
+                                } else {
+                                  vendorId = item['vendorId'].toString();
+                                }
+                              } else if (_normalizedStore['_id'] != null) {
+                                vendorId = _normalizedStore['_id'].toString();
+                              } else {
+                                // Fallback to store ID from normalized store
+                                vendorId = _normalizedStore['id']?.toString() ?? _normalizedStore['vendorId']?.toString();
+                              }
+                              
+                              // Print the data being added to cart
+                              print('🛒 Adding item to cart from product card:');
+                              print('  - Product ID: $productId');
+                              print('  - Product Name: ${item['name']?.toString() ?? 'Unnamed Product'}');
+                              print('  - Product Price: $price');
+                              print('  - Quantity: 1');
+                              print('  - Image URL: ${item['image'] ?? item['imageUrl'] ?? ''}');
+                              print('  - Vendor ID: $vendorId');
+                              print('  - Store Name: ${store.name}');
+                              print('  - Store ID: ${store.id}');
+                              print('  - Cart items before adding: ${cartProvider.items.length}');
+                              
+                              cartProvider.addStoreItem(
+                                id: productId,
+                                name: item['name']?.toString() ?? 'Unnamed Product',
+                                price: price,
+                                quantity: 1,
+                                image: item['image'] ?? item['imageUrl'] ?? '',
+                                vendorId: vendorId,
+                                store: store,
+                              );
+                              
+                              print('  - Cart items after adding: ${cartProvider.items.length}');
+                              print('  - Total cart items: ${cartProvider.items.length}');
+                              
+                              // Show success message
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${item['name']} added to cart'),
+                                  behavior: SnackBarBehavior.floating,
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error adding to cart: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
                           },
                           child: Container(
                             width: 32,
@@ -860,9 +1020,9 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                               child: InkWell(
                                 onTap: () {
                                   if (quantity > 1) {
-                                    cartProvider.updateQuantity(productId, quantity - 1);
+                                    cartProvider.updateQuantity(productId, CartItemType.store, quantity - 1);
                                   } else {
-                                    cartProvider.removeItem(productId);
+                                    cartProvider.removeItem(productId, CartItemType.store);
                                   }
                                 },
                                 child: SizedBox(
@@ -895,7 +1055,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                               color: Colors.transparent,
                               child: InkWell(
                                 onTap: () {
-                                  cartProvider.updateQuantity(productId, quantity + 1);
+                                  cartProvider.updateQuantity(productId, CartItemType.store, quantity + 1);
                                 },
                                 child: SizedBox(
                                   width: 32,
@@ -956,6 +1116,8 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
         ],
       ),
     ));
+      },
+    );
   }
 
   Widget _buildFullMenu() {

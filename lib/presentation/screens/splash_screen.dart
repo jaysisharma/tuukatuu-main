@@ -354,7 +354,7 @@ class _SplashScreenState extends State<SplashScreen>
                     child: Column(
                       children: [
                         Text(
-                          'TuukaTuu',
+                          'TukaTuu',
                           style: GoogleFonts.poppins(
                             fontSize: 42,
                             fontWeight: FontWeight.bold,
@@ -428,7 +428,7 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '© 2025 TuukaTuu. All rights reserved.',
+                    '© 2025 TukaTuu. All rights reserved.',
                     style: GoogleFonts.poppins(
                       fontSize: 11,
                       color: AppTheme.textTertiary,

@@ -7,7 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/config/app_config.dart';
 import '../../core/config/app_theme.dart';
 import '../../providers/auth_provider.dart';
-import '../../core/config/routes.dart';
+import '../screens/main_screen.dart';
 
 class OrderPlacedScreen extends StatefulWidget {
   final String orderId;
@@ -182,29 +182,16 @@ class _OrderPlacedScreenState extends State<OrderPlacedScreen>
   }
 
   void _navigateToHome() {
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      AppRoutes.home,
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MainScreen()),
       (route) => false,
     );
   }
 
   void _navigateToOrders() {
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      AppRoutes.orders,
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MainScreen(initialTabIndex: 2)),
       (route) => false,
-    );
-  }
-
-  void _trackOrder() {
-    Navigator.of(context).pushNamed(
-      AppRoutes.orderTracking,
-      arguments: {
-        'orderId': widget.orderId,
-        'initialOrder': {
-          'id': widget.orderId,
-          'status': _orderStatus ?? 'pending',
-        },
-      },
     );
   }
 
@@ -559,29 +546,17 @@ class _OrderPlacedScreenState extends State<OrderPlacedScreen>
     return Column(
       children: [
         _buildActionButton(
-          onPressed: _trackOrder,
-          text: 'Track Order',
-          icon: Icons.track_changes,
+          onPressed: _navigateToOrders,
+          text: 'View All Orders',
+          icon: Icons.shopping_bag,
           isPrimary: true,
         ),
         const SizedBox(height: 12),
         _buildActionButton(
-          onPressed: _navigateToOrders,
-          text: 'View All Orders',
-          icon: Icons.shopping_bag,
-          isPrimary: false,
-        ),
-        const SizedBox(height: 12),
-        TextButton(
           onPressed: _navigateToHome,
-          child: Text(
-            'Back to Home',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: AppTheme.textSecondary,
-            ),
-          ),
+          text: 'Back to Home',
+          icon: Icons.home,
+          isPrimary: false,
         ),
       ],
     );

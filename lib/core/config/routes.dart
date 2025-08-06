@@ -29,9 +29,6 @@ class AppRoutes {
   static const String tmartProductDetail = '/tmart-product-detail';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
-    print('Route requested: ${settings.name}');
-    print('Route arguments: ${settings.arguments}');
-    print('Available routes: $home, $tMart, $favorites, $orders, $orderTracking, $storeDetails, $productDetails, $location, $cart, $checkout');
     switch (settings.name) {
       case home:
         return MaterialPageRoute(builder: (_) => const HomeScreen());
@@ -65,6 +62,8 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const MultiStoreCartScreen());
       case multiStoreCart:
         return MaterialPageRoute(builder: (_) => const MultiStoreCartScreen());
+      case '/multi-store-cart':
+        return MaterialPageRoute(builder: (_) => const MultiStoreCartScreen());
       // case checkout:
       //   final args = settings.arguments as Map<String, dynamic>;
       //   return MaterialPageRoute(
@@ -88,10 +87,8 @@ class AppRoutes {
           ),
         );
       case productDetails:
-        print('ProductDetails route matched');
         if (settings.arguments != null) {
           final product = settings.arguments as Map<String, dynamic>;
-          print('Product arguments: $product');
           return MaterialPageRoute(
             builder: (_) => ProductDetailsScreen(product: product['product']),
           );
@@ -123,7 +120,6 @@ class AppRoutes {
           ),
         );
       default:
-        print('Route not found, falling to default case for: ${settings.name}');
         return MaterialPageRoute(
           builder: (_) => Scaffold(
             body: Center(

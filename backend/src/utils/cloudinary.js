@@ -3,9 +3,9 @@ const fs = require('fs');
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+  cloud_name: 'dyugb2jp8',
+  api_key: '434489253172958',
+  api_secret: 'MCetPW20Oppujxj4A9q63zGol70'
 });
 
 // Upload image to Cloudinary

@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:tuukatuu/presentation/screens/orders/order_history_screen.dart';
-import '../../providers/cart_provider.dart';
-import '../../providers/mart_cart_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../services/order_polling_service.dart';
 import '../../utils/double_back_exit.dart';
-import '../../core/config/routes.dart';
 import 'home/home_screen.dart';
 import 't_mart_clean_screen.dart';
-import 'orders/orders_screen.dart';
 import 'profile/profile_screen.dart';
-import 'unified_cart_screen.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final int? initialTabIndex;
+  
+  const MainScreen({super.key, this.initialTabIndex});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -25,8 +21,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   
   final List<Widget> _screens = [
     const HomeScreen(),
-            const TMartCleanScreen(),
-    const UnifiedCartScreen(),
+    const TMartCleanScreen(),
     const OrderHistoryScreen(),
     const ProfileScreen(),
   ];
@@ -34,6 +29,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    // Set initial tab index if provided
+    if (widget.initialTabIndex != null) {
+      _currentIndex = widget.initialTabIndex!;
+    }
     WidgetsBinding.instance.addObserver(this);
     _initializeOrderPolling();
   }
@@ -78,78 +77,34 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           index: _currentIndex,
           children: _screens,
         ),
-        bottomNavigationBar: Consumer2<CartProvider, MartCartProvider>(
-          builder: (context, cartProvider, martCartProvider, child) {
-            final totalItems = cartProvider.itemCount + martCartProvider.itemCount;
-            
-            return BottomNavigationBar(
-              type: BottomNavigationBarType.fixed,
-              currentIndex: _currentIndex,
-              onTap: (index) {
-                if (index == 2) {
-                  // Navigate to unified cart
-                  Navigator.pushNamed(context, AppRoutes.cart);
-                } else {
-                  setState(() {
-                    _currentIndex = index;
-                  });
-                }
-              },
-              selectedItemColor: const Color(0xFF2E7D32),
-              unselectedItemColor: Colors.grey,
-              items: [
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.home),
-                  label: 'Home',
-                ),
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.store),
-                  label: 'T-Mart',
-                ),
-                BottomNavigationBarItem(
-                  icon: Stack(
-                    children: [
-                      const Icon(Icons.shopping_cart),
-                      if (totalItems > 0)
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 16,
-                              minHeight: 16,
-                            ),
-                            child: Text(
-                              totalItems.toString(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  label: 'Cart',
-                ),
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.receipt_long),
-                  label: 'Orders',
-                ),
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.person),
-                  label: 'Profile',
-                ),
-              ],
-            );
+        bottomNavigationBar: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
+          currentIndex: _currentIndex,
+          onTap: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
           },
+          selectedItemColor: const Color(0xFFFC8019),
+          unselectedItemColor: Colors.grey,
+          items: [
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.store),
+              label: 'T-Mart',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.receipt_long),
+              label: 'Orders',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.person),
+              label: 'Profile',
+            ),
+          ],
         ),
       ),
     );

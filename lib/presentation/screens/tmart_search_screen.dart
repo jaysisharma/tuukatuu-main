@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:tuukatuu/providers/mart_cart_provider.dart';
+import 'package:tuukatuu/providers/unified_cart_provider.dart';
 import 'package:tuukatuu/services/api_service.dart';
 import 'package:tuukatuu/presentation/widgets/tmart_product_card.dart';
 
@@ -211,7 +211,7 @@ class _TMartSearchScreenState extends State<TMartSearchScreen> {
                   child: Text(
                     'Clear All',
                     style: GoogleFonts.poppins(
-                      color: const Color(0xFF2E7D32),
+                      color: const Color(0xFFFC8019),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -318,7 +318,7 @@ class _TMartSearchScreenState extends State<TMartSearchScreen> {
                   _loadProducts(refresh: true);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E7D32),
+                  backgroundColor: const Color(0xFFFC8019),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -345,7 +345,7 @@ class _TMartSearchScreenState extends State<TMartSearchScreen> {
       title: Text(label, style: GoogleFonts.poppins()),
       value: value,
       onChanged: onChanged,
-      activeColor: const Color(0xFF2E7D32),
+      activeColor: const Color(0xFFFC8019),
     );
   }
 
@@ -354,7 +354,7 @@ class _TMartSearchScreenState extends State<TMartSearchScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2E7D32),
+        backgroundColor: const Color(0xFFFC8019),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -462,31 +462,45 @@ class _TMartSearchScreenState extends State<TMartSearchScreen> {
           }
           
           final product = _products[index];
-          return Consumer<MartCartProvider>(
-            builder: (context, martCartProvider, child) {
-              final quantity = martCartProvider.getItemQuantity(product['_id'] ?? '');
+          return Consumer<UnifiedCartProvider>(
+            builder: (context, cartProvider, child) {
+              final productId = product['_id'] ?? '';
+              final quantity = cartProvider.getItemQuantity(productId, CartItemType.tmart);
               
               return TMartProductCard(
                 item: product,
                 quantity: quantity,
                 onAdd: () {
-                  martCartProvider.addItem(product);
+                  // Create CartItem for T-Mart product
+                  final cartItem = CartItem(
+                    id: productId,
+                    name: product['name'] ?? '',
+                    price: (product['price'] ?? 0).toDouble(),
+                    quantity: 1,
+                    image: product['image'] ?? '',
+                    type: CartItemType.tmart,
+                    vendorId: 'tmart',
+                    vendorName: 'T-Mart',
+                    notes: '',
+                  );
+                  
+                  cartProvider.addItem(cartItem);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('${product['name']} added to cart'),
-                      backgroundColor: const Color(0xFF2E7D32),
+                      backgroundColor: const Color(0xFFFC8019),
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
                 },
                 onIncrement: () {
-                  martCartProvider.updateQuantity(product['_id'] ?? '', quantity + 1);
+                  cartProvider.updateQuantity(productId, CartItemType.tmart, quantity + 1);
                 },
                 onDecrement: () {
                   if (quantity > 1) {
-                    martCartProvider.updateQuantity(product['_id'] ?? '', quantity - 1);
+                    cartProvider.updateQuantity(productId, CartItemType.tmart, quantity - 1);
                   } else {
-                    martCartProvider.removeItem(product['_id'] ?? '');
+                    cartProvider.removeItem(productId, CartItemType.tmart);
                   }
                 },
               );
@@ -582,7 +596,7 @@ class _TMartSearchScreenState extends State<TMartSearchScreen> {
           ElevatedButton(
             onPressed: () => _loadProducts(refresh: true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2E7D32),
+              backgroundColor: const Color(0xFFFC8019),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

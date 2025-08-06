@@ -221,6 +221,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       GestureDetector(
                         onTap: () {
                           // Add to cart logic
+                          print('🛒 Product Details - Adding item to cart:');
+                          print('  - Item: ${product.name}');
+                          print('  - Price: ${product.price}');
+                          print('  - Cart items before: ${cartProvider.items.length}');
+                          
                           cartProvider.addStoreItem(
                             id: product.id,
                             name: product.name,
@@ -230,6 +235,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                             vendorId: product.vendorId,
                             store: _store,
                           );
+                          
+                          print('  - Cart items after: ${cartProvider.items.length}');
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('${product.name} added to cart'),
@@ -381,6 +388,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     final theme = Theme.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
+    print('🛒 Product Details - Build method:');
+    print('  - Cart items count: ${cartProvider.items.length}');
+    print('  - Should show FAB: ${cartProvider.items.isNotEmpty}');
+    
     // Check if this product is in cart
     final cartItem = cartProvider.items.firstWhere(
       (item) => item.id == widget.product.id && item.type == CartItemType.store,
@@ -457,15 +468,21 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                             color: isDark ? theme.cardColor : Colors.grey[100],
                           ),
                           child: PageView.builder(
-                            itemCount: widget.product.images.length,
+                            itemCount: widget.product.images.isNotEmpty ? widget.product.images.length : 1,
                             onPageChanged: (index) {
                               setState(() {
                                 _currentImageIndex = index;
                               });
                             },
                             itemBuilder: (context, index) {
+                              // If no images array or empty, use the main imageUrl
+                              String imageUrl = widget.product.imageUrl;
+                              if (widget.product.images.isNotEmpty && index < widget.product.images.length) {
+                                imageUrl = widget.product.images[index];
+                              }
+                              
                               return CachedImage(
-                                imageUrl: widget.product.images[index],
+                                imageUrl: imageUrl,
                                 fit: BoxFit.contain,
                               );
                             },
@@ -486,22 +503,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                             ),
                           ),
                         ),
-                        Positioned(
-                          top: 16,
-                          right: 16,
-                          child: IconButton(
-                            onPressed: () {},
-                            icon: Icon(
-                              Icons.favorite_border,
-                              color: isDark ? Colors.grey[100] : Colors.grey[900],
-                            ),
-                            style: IconButton.styleFrom(
-                              backgroundColor: theme.cardColor,
-                              elevation: 2,
-                            ),
-                          ),
-                        ),
-                        if (widget.product.images.length > 1)
+                        
+                        if (widget.product.images.isNotEmpty && widget.product.images.length > 1)
                           Positioned(
                             bottom: 16,
                             left: 0,
@@ -833,6 +836,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
+                        print('🛒 Product Details - Main Add to Cart button:');
+                        print('  - Item: ${widget.product.name}');
+                        print('  - Price: ${widget.product.price}');
+                        print('  - Quantity: $_quantity');
+                        print('  - Cart items before: ${cartProvider.items.length}');
+                        
                         cartProvider.addStoreItem(
                           id: widget.product.id,
                           name: widget.product.name,
@@ -842,6 +851,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           vendorId: widget.product.vendorId,
                           store: _store,
                         );
+                        
+                        print('  - Cart items after: ${cartProvider.items.length}');
                         setState(() {
                           _cartQuantity = _quantity;
                         });

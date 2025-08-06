@@ -58,6 +58,26 @@ class _TMartCartScreenState extends State<TMartCartScreen> {
                 ),
               ),
             ),
+          // Debug button to force clear cart
+          if (items.isNotEmpty)
+            TextButton(
+              onPressed: () {
+                martCartProvider.forceClearCart();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Cart force cleared for debugging'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              },
+              child: Text(
+                'Debug Clear',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
         ],
       ),
       body: items.isEmpty
@@ -529,34 +549,30 @@ class _TMartCartScreenState extends State<TMartCartScreen> {
       final finalTotal = total + deliveryFee;
 
       // Navigate to checkout screen
-      final result = await Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => CheckoutScreen(
             totalAmount: finalTotal,
             cartItems: martCartProvider.items,
             isTmartOrder: true,
+            onOrderSuccess: () {
+              // Clear the mart cart when order is successful
+              print('🛒 T-Mart Cart: Clearing cart on order success');
+              martCartProvider.forceClearCart();
+            },
           ),
         ),
       );
 
-      // If order was successful, clear cart
-      if (result == true) {
-        martCartProvider.clearCart();
-        Navigator.pop(context); // Go back to T-Mart screen
-        
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Order placed successfully!',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+      // Note: We don't need to handle result here because the OrderPlacedScreen
+      // uses pushAndRemoveUntil which clears the navigation stack.
+      // The cart is cleared via the onOrderSuccess callback.
+      
+      // Additional safety check: Clear cart if we return here (in case onOrderSuccess wasn't called)
+      print('🛒 T-Mart Cart: Checkout completed, ensuring cart is cleared');
+      martCartProvider.forceClearCart();
+      
     } catch (e) {
       print('❌ Error during checkout: $e');
       ScaffoldMessenger.of(context).showSnackBar(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/address.dart';
 import 'package:provider/provider.dart';
 import '../../providers/address_provider.dart';
-import '../../providers/cart_provider.dart';
+import '../../providers/unified_cart_provider.dart';
 import '../../providers/mart_cart_provider.dart';
 import 'order_placed_screen.dart';
 import '../../providers/auth_provider.dart';
@@ -15,12 +15,16 @@ class CheckoutScreen extends StatefulWidget {
   final double totalAmount;
   final List<Map<String, dynamic>> cartItems;
   final bool isTmartOrder;
+  final VoidCallback? onOrderSuccess;
+  final String? vendorId; // Add vendorId parameter
 
   const CheckoutScreen({
     super.key,
     required this.totalAmount,
     required this.cartItems,
     this.isTmartOrder = false,
+    this.onOrderSuccess,
+    this.vendorId,
   });
 
   @override
@@ -208,7 +212,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final addressProvider = Provider.of<AddressProvider>(context);
-    Provider.of<CartProvider>(context);
+    Provider.of<UnifiedCartProvider>(context);
     final addresses = addressProvider.addresses;
     
     // Debug logging
@@ -594,14 +598,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             }
                             final selectedAddress = addresses[_selectedAddressIndex];
                             
-                            // Use the appropriate cart provider based on order type
-                            dynamic cartProvider;
-                            if (widget.isTmartOrder || 
-                                (widget.cartItems.isNotEmpty && widget.cartItems.first['orderType'] == 'tmart')) {
-                              cartProvider = Provider.of<MartCartProvider>(context, listen: false);
-                            } else {
-                              cartProvider = Provider.of<CartProvider>(context, listen: false);
-                            }
+                            // Use the unified cart provider
+                            final cartProvider = Provider.of<UnifiedCartProvider>(context, listen: false);
+                            
+                            // Determine if this is a T-Mart order
+                            final isTmartOrder = widget.isTmartOrder || 
+                                (widget.cartItems.isNotEmpty && widget.cartItems.first['orderType'] == 'tmart');
                             
                             // Get vendorId from cart items instead of cart provider
                             String? vendorId;
@@ -611,10 +613,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               print("Vendor ID from cart items: $vendorId");
                             }
                             
-                            // Fallback to cart provider vendorId if not found in cart items
+                            // Fallback to hardcoded vendorId if not found in cart items
                             if (vendorId == null || vendorId.isEmpty) {
-                              vendorId = cartProvider.vendorId;
-                              print("Fallback Vendor ID from cart provider: $vendorId");
+                              vendorId = isTmartOrder ? 'tmart' : 'vendor_id';
+                              print("Fallback Vendor ID: $vendorId");
                             }
                             final items = widget.cartItems.map((item) => {
                               'product': item['id'],
@@ -638,9 +640,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               return;
                             }
 
-                            // Determine if this is a T-Mart order
-                            final isTmartOrder = widget.isTmartOrder || 
-                                (widget.cartItems.isNotEmpty && widget.cartItems.first['orderType'] == 'tmart');
                             print("Final Vendor ID: $vendorId");
                             print("Cart items: ${widget.cartItems.length}");
                             if (widget.cartItems.isNotEmpty) {
@@ -684,7 +683,29 @@ print("Place Order Pressed");
                                 token: authProvider.jwtToken,
                                 body: orderPayload,
                               );
-                              cartProvider.clearCart();
+                              // Clear only the specific vendor's items instead of entire cart
+                              if (widget.vendorId != null) {
+                                print('🛒 Checkout - Clearing items for vendor: ${widget.vendorId}');
+                                cartProvider.clearItemsByVendor(widget.vendorId!);
+                              } else {
+                                print('🛒 Checkout - No vendorId provided, clearing entire cart');
+                                cartProvider.clearCart();
+                              }
+                              
+                              // For T-Mart orders, also clear the MartCartProvider
+                              if (widget.isTmartOrder) {
+                                print('🛒 Checkout - Clearing MartCartProvider for T-Mart order');
+                                final martCartProvider = Provider.of<MartCartProvider>(context, listen: false);
+                                print('🛒 Checkout - MartCartProvider items before clearing: ${martCartProvider.items.length}');
+                                martCartProvider.forceClearCart();
+                                print('🛒 Checkout - MartCartProvider items after clearing: ${martCartProvider.items.length}');
+                              }
+                              
+                              // Call the success callback if provided
+                              if (widget.onOrderSuccess != null) {
+                                widget.onOrderSuccess!();
+                              }
+                              
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(

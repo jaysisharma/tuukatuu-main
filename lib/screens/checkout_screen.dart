@@ -4,6 +4,7 @@ import '../models/address.dart';
 import 'package:provider/provider.dart';
 import '../providers/address_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/unified_cart_provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../widgets/cached_image.dart';
 import '../services/api_service.dart';
@@ -12,12 +13,14 @@ class CheckoutScreen extends StatefulWidget {
   final double totalAmount;
   final List<Map<String, dynamic>> cartItems;
   final bool isTmartOrder;
+  final VoidCallback? onOrderSuccess;
 
   const CheckoutScreen({
     super.key,
     required this.totalAmount,
     required this.cartItems,
     this.isTmartOrder = false,
+    this.onOrderSuccess,
   });
 
   @override
@@ -122,21 +125,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final addressProvider = Provider.of<AddressProvider>(context, listen: false);
     
-    print('🔍 Checkout: Initializing address provider...');
-    print('🔍 Checkout: JWT Token available: ${authProvider.jwtToken != null}');
-    
     if (authProvider.jwtToken != null) {
-      print('🔍 Checkout: JWT Token: ${authProvider.jwtToken!.substring(0, 20)}...');
       addressProvider.initialize(authProvider.jwtToken!);
-      print('🔍 Checkout: Address provider initialized with token');
       
       // Test API connection first
       _testApiConnection().then((isConnected) {
         if (isConnected) {
-          print('🔍 Checkout: API connection successful, fetching addresses...');
           // Fetch addresses after initialization
           addressProvider.fetchAddresses().then((_) {
-            print('🔍 Checkout: Addresses loaded: ${addressProvider.addresses.length}');
             if (mounted) {
               setState(() {
                 // Reset selected address index if current selection is invalid
@@ -146,7 +142,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               });
             }
           }).catchError((error) {
-            print('❌ Error fetching addresses: $error');
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -157,7 +152,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             }
           });
         } else {
-          print('❌ Checkout: API connection failed');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -169,7 +163,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         }
       });
     } else {
-      print('❌ Checkout: No JWT token available');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -183,12 +176,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<bool> _testApiConnection() async {
     try {
-      print('🔍 Checkout: Testing API connection...');
       final response = await ApiService.get('/auth/me', token: Provider.of<AuthProvider>(context, listen: false).jwtToken);
-      print('🔍 Checkout: API connection test successful: $response');
       return true;
     } catch (e) {
-      print('❌ Checkout: API connection test failed: $e');
       return false;
     }
   }
@@ -226,9 +216,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final showMoreButton = !_showAllAddresses && addresses.length > 2;
     final visibleAddresses = showMoreButton ? addresses.take(2).toList() : addresses;
     
-    print('🔍 Checkout Build: Addresses count: ${addresses.length}, Loading: ${addressProvider.isLoading}');
-    print('🔍 Checkout Build: Selected address index: $_selectedAddressIndex');
-    print('🔍 Checkout Build: Visible addresses: ${visibleAddresses.length}');
+    print('🛒 Checkout - Build method:');
+    print('  - Cart items: ${widget.cartItems.length}');
+    print('  - Total amount: ${widget.totalAmount}');
+    print('  - Is T-Mart: ${widget.isTmartOrder}');
+    print('  - Addresses loaded: ${addresses.length}');
+    print('  - Selected address index: $_selectedAddressIndex');
+    print('  - Payment method: $_selectedPaymentMethodIndex');
+    print('  - Delivery time: $_selectedDeliveryTimeIndex');
+    print('  - Tip amount: ${_getSelectedTip()}');
+    print('  - Final total: ${_calculateFinalTotal()}');
 
     return Scaffold(
       appBar: AppBar(
@@ -459,7 +456,38 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final addressProvider = Provider.of<AddressProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
+    print('🛒 Checkout - Starting order placement:');
+    print('  - Cart items count: ${widget.cartItems.length}');
+    print('  - Total amount: ${widget.totalAmount}');
+    print('  - Is T-Mart order: ${widget.isTmartOrder}');
+    print('  - Addresses available: ${addressProvider.addresses.length}');
+    print('  - Selected address index: $_selectedAddressIndex');
+    print('  - Payment method index: $_selectedPaymentMethodIndex');
+    print('  - Delivery time index: $_selectedDeliveryTimeIndex');
+    print('  - Tip amount: ${_getSelectedTip()}');
+    print('  - Instructions: ${_instructionsController.text}');
+    
+    // Debug: Print cart items details
+    if (widget.cartItems.isNotEmpty) {
+      print('  - Cart items details:');
+      for (int i = 0; i < widget.cartItems.length; i++) {
+        final item = widget.cartItems[i];
+        print('    * Item ${i + 1}:');
+        print('      - ID: ${item['id']}');
+        print('      - Name: ${item['name']}');
+        print('      - Price: ${item['price']}');
+        print('      - Quantity: ${item['quantity']}');
+        print('      - Vendor ID: ${item['vendorId']}');
+        print('      - Vendor Name: ${item['vendorName']}');
+        print('      - Type: ${item['type']}');
+        print('      - Order Type: ${item['orderType']}');
+      }
+    } else {
+      print('  - WARNING: No cart items received!');
+    }
+    
     if (addressProvider.addresses.isEmpty) {
+      print('❌ Checkout - No addresses available');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please add a delivery address first'),
@@ -470,6 +498,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     if (_selectedAddressIndex < 0 || _selectedAddressIndex >= addressProvider.addresses.length) {
+      print('❌ Checkout - Invalid address selection');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select a delivery address'),
@@ -480,9 +509,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     final selectedAddress = addressProvider.addresses[_selectedAddressIndex];
+    print('  - Selected address: ${selectedAddress.label}');
+    print('  - Address details: ${selectedAddress.address}');
+    print('  - Coordinates: ${selectedAddress.latitude}, ${selectedAddress.longitude}');
     
     // Validate address coordinates
     if (selectedAddress.latitude == 0 && selectedAddress.longitude == 0) {
+      print('❌ Checkout - Address missing coordinates');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Selected address is missing coordinates. Please select a valid address.'),
@@ -496,29 +529,48 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final isTmartOrder = widget.isTmartOrder || 
         (widget.cartItems.isNotEmpty && widget.cartItems.first['orderType'] == 'tmart');
     
+    print('  - Final isTmartOrder: $isTmartOrder');
+    
     // Calculate totals
     final itemTotal = widget.cartItems.fold<double>(0, (sum, item) => sum + (item['price'] * item['quantity']));
     final deliveryFee = isTmartOrder ? (itemTotal >= 500 ? 0.0 : 40.0) : 40.0;
     final tax = itemTotal * 0.05;
     final tip = _getSelectedTip();
     final total = itemTotal + tax + deliveryFee + tip;
+    
+    print('  - Item total: $itemTotal');
+    print('  - Delivery fee: $deliveryFee');
+    print('  - Tax: $tax');
+    print('  - Tip: $tip');
+    print('  - Final total: $total');
 
     // Get vendorId from cart items
     String? vendorId;
     if (widget.cartItems.isNotEmpty) {
       final firstItem = widget.cartItems.first;
       vendorId = firstItem['vendorId']?.toString();
+      print('  - First item vendorId: $vendorId');
     }
     
     // Fallback to hardcoded values if not found
     if (vendorId == null || vendorId.isEmpty) {
       vendorId = isTmartOrder ? 'tmart' : 'vendor_id';
+      print('  - Using fallback vendorId: $vendorId');
     }
     
-    print("Checkout - Vendor ID: $vendorId");
-    print("Checkout - Cart items: ${widget.cartItems.length}");
-    if (widget.cartItems.isNotEmpty) {
-      print("Checkout - First cart item: ${widget.cartItems.first}");
+    print('  - Building order payload...');
+    print('  - Cart items details:');
+    for (int i = 0; i < widget.cartItems.length; i++) {
+      final item = widget.cartItems[i];
+      print('    * Item ${i + 1}:');
+      print('      - ID: ${item['id']}');
+      print('      - Name: ${item['name']}');
+      print('      - Price: ${item['price']}');
+      print('      - Quantity: ${item['quantity']}');
+      print('      - Image: ${item['image'] ?? item['imageUrl']}');
+      print('      - Unit: ${item['unit']}');
+      print('      - Vendor ID: ${item['vendorId']}');
+      print('      - Order Type: ${item['orderType']}');
     }
     
     final orderPayload = {
@@ -548,19 +600,61 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'label': selectedAddress.label,
       },
     };
+    
+    print('  - Order payload created:');
+    print('    * Vendor ID: ${orderPayload['vendorId']}');
+    print('    * Items count: ${(orderPayload['items'] as List).length}');
+    print('    * Item Total: ${orderPayload['itemTotal']}');
+    print('    * Tax: ${orderPayload['tax']}');
+    print('    * Delivery Fee: ${orderPayload['deliveryFee']}');
+    print('    * Tip: ${orderPayload['tip']}');
+    print('    * Total: ${orderPayload['total']}');
+    print('    * Delivery Address: ${orderPayload['deliveryAddress']}');
+    print('    * Instructions: ${orderPayload['instructions']}');
+    print('    * Payment Method: ${orderPayload['paymentMethod']}');
+    print('    * Order Type: ${orderPayload['orderType']}');
+    print('    * Priority: ${orderPayload['priority']}');
+    print('    * Customer Location: ${orderPayload['customerLocation']}');
 
     try {
       final endpoint = isTmartOrder ? '/orders/tmart' : '/orders';
+      print('  - Making API call to: $endpoint');
+      print('  - JWT Token available: ${authProvider.jwtToken != null}');
+      
       final order = await ApiService.post(
         endpoint,
         token: authProvider.jwtToken,
         body: orderPayload,
       );
       
+      print('✅ Checkout - Order placed successfully!');
+      print('  - Order response: $order');
+      
+      // Clear the cart after successful order
+      final unifiedCartProvider = Provider.of<UnifiedCartProvider>(context, listen: false);
+      unifiedCartProvider.clearCart();
+      print('🛒 Cart cleared after successful order');
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Order placed successfully! Your cart has been cleared.'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      
+      // Call the success callback if provided
+      if (widget.onOrderSuccess != null) {
+        widget.onOrderSuccess!();
+      }
+      
       // Order placed successfully
       
       Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
+      print('❌ Checkout - Error placing order: $e');
       // Silent error handling
     }
   }

@@ -112,6 +112,119 @@ class ApiService {
     return [];
   }
 
+  static Future<List<Product>> searchProducts(String query, {int limit = 10, int page = 1}) async {
+    try {
+      print('🔍 API Service: Searching for "$query"');
+      
+      final params = <String, String>{
+        'search': query.trim(),
+        'limit': limit.toString(),
+        'page': page.toString(),
+      };
+      
+      final response = await get('/products', params: params);
+      
+      if (response != null && response['data'] != null) {
+        final products = (response['data'] as List)
+            .map((json) => Product.fromJson(json))
+            .toList();
+        
+        print('✅ API Service: Found ${products.length} products for "$query"');
+        return products;
+      } else {
+        print('❌ API Service: No products found for "$query"');
+        return [];
+      }
+    } catch (e) {
+      print('❌ API Service: Search error for "$query": $e');
+      return [];
+    }
+  }
+
+  static Future<List<Product>> getPopularProducts({int limit = 6}) async {
+    try {
+      print('🔍 API Service: Loading popular products');
+      
+      final params = <String, String>{
+        'limit': limit.toString(),
+        'isPopular': 'true',
+      };
+      
+      final response = await get('/products', params: params);
+      
+      if (response != null && response['data'] != null) {
+        final products = (response['data'] as List)
+            .map((json) => Product.fromJson(json))
+            .toList();
+        
+        print('✅ API Service: Loaded ${products.length} popular products');
+        return products;
+      } else {
+        print('❌ API Service: No popular products found');
+        return [];
+      }
+    } catch (e) {
+      print('❌ API Service: Error loading popular products: $e');
+      return [];
+    }
+  }
+
+  static Future<List<Product>> getSimilarProducts(String productId, {int limit = 6}) async {
+    try {
+      print('🔍 API Service: Loading similar products for product $productId');
+      
+      final params = <String, String>{
+        'productId': productId,
+        'limit': limit.toString(),
+      };
+      
+      final response = await get('/products/similar', params: params);
+      
+      if (response != null && response['data'] != null) {
+        final products = (response['data'] as List)
+            .map((json) => Product.fromJson(json))
+            .toList();
+        
+        print('✅ API Service: Loaded ${products.length} similar products');
+        return products;
+      } else {
+        print('❌ API Service: No similar products found');
+        return [];
+      }
+    } catch (e) {
+      print('❌ API Service: Error loading similar products: $e');
+      return [];
+    }
+  }
+
+  static Future<List<Product>> getRecommendations({int limit = 6}) async {
+    try {
+      print('🔍 API Service: Loading recommendations');
+      
+      final params = <String, String>{
+        'limit': limit.toString(),
+        'isFeatured': 'true',
+      };
+      
+      final response = await get('/products', params: params);
+      
+      if (response != null && response['data'] != null) {
+        final products = (response['data'] as List)
+            .map((json) => Product.fromJson(json))
+            .toList();
+        
+        print('✅ API Service: Loaded ${products.length} recommendations');
+        return products;
+      } else {
+        print('❌ API Service: No recommendations found');
+        return [];
+      }
+    } catch (e) {
+      print('❌ API Service: Error loading recommendations: $e');
+      return [];
+    }
+  }
+
   static Future<List<dynamic>> getProductsByVendor(String vendorId) async {
     try {
       print('🔍 Fetching products for vendor: $vendorId');
@@ -139,6 +252,37 @@ class ApiService {
       }
     } catch (e) {
       print('❌ Error fetching products by vendor: $e');
+      return [];
+    }
+  }
+
+  static Future<List<dynamic>> getProductsByVendorName(String vendorName) async {
+    try {
+      print('🔍 Fetching products for vendor name: $vendorName');
+      
+      if (vendorName.isEmpty) {
+        print('❌ Vendor name is empty');
+        return [];
+      }
+      
+      final params = <String, String>{'vendorName': vendorName};
+      final response = await get('/products', params: params);
+      
+      if (response is Map<String, dynamic> && response['data'] is List) {
+        // Backend returns products in the 'data' field
+        final products = response['data'] as List;
+        print('🔍 Found ${products.length} products for vendor name $vendorName');
+        return products;
+      } else if (response is List) {
+        // Direct list response (fallback)
+        print('🔍 Found ${response.length} products for vendor name $vendorName (direct response)');
+        return response;
+      } else {
+        print('🔍 No products found for vendor name $vendorName. Response: $response');
+        return [];
+      }
+    } catch (e) {
+      print('❌ Error fetching products by vendor name: $e');
       return [];
     }
   }
@@ -220,14 +364,6 @@ class ApiService {
 
   static Future<List<Product>> getPopularItems() async {
     final res = await get('/tmart/popular');
-    if (res is List) {
-      return res.map((e) => Product.fromJson(e)).toList();
-    }
-    return [];
-  }
-
-  static Future<List<Product>> getRecommendations() async {
-    final res = await get('/tmart/recommendations');
     if (res is List) {
       return res.map((e) => Product.fromJson(e)).toList();
     }

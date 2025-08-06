@@ -103,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
     print('🔄 HomeScreen: Refreshing data...');
     
     try {
-      // Reset all loading states
+      // Reset all loading states and errors
       setState(() {
         _loadingBanners = true;
         _loadingCoupons = true;
@@ -111,10 +111,13 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadingAllStores = true;
         _loadingPopularNearYou = true;
         _loadingFeaturedRestaurants = true;
+        _errorFeaturedStores = null;
+        _errorAllStores = null;
+        _errorPopularNearYou = null;
+        _errorFeaturedRestaurants = null;
       });
 
-      // Fetch all data concurrently with a small delay for better UX
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Fetch all data concurrently
       await Future.wait([
         _fetchBanners(),
         _fetchCoupons(),
@@ -139,6 +142,16 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       print('❌ HomeScreen: Error refreshing data: $e');
+      
+      // Ensure loading states are set to false even if there's an error
+      setState(() {
+        _loadingBanners = false;
+        _loadingCoupons = false;
+        _loadingFeaturedStores = false;
+        _loadingAllStores = false;
+        _loadingPopularNearYou = false;
+        _loadingFeaturedRestaurants = false;
+      });
       
       // Show error message
       if (mounted) {
@@ -281,6 +294,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(height: 8),
                           _buildFeaturedStoresWithRetry(),
                           const Divider(height: 24),
+                          _buildFeaturedRestaurantsWithRetry(),
+                          const Divider(height: 24),
                           // _buildPopularNearYouWithRetry(),
                           // const Divider(height: 24),
                           _buildQuickEssentials(),
@@ -349,12 +364,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildCategories() {
     final categories = [
+      
       {'icon': Icons.local_mall, 'label': 'T-Mart', 'color': Colors.blue, 'route': 't-mart'},
-      {'icon': Icons.wine_bar, 'label': 'wine', 'color': Colors.purple, 'route': 'category'},
-      {'icon': Icons.fastfood, 'label': 'Fast Food', 'color': Colors.orange, 'route': 'category'},
+         {'icon': Icons.local_grocery_store, 'label': 'Grocery', 'color': Colors.teal, 'route': 'category'},
+    
+       {'icon': Icons.fastfood, 'label': 'Fast Food', 'color': Colors.orange, 'route': 'category'},
       {'icon': Icons.local_pharmacy, 'label': 'Pharmacy', 'color': Colors.green, 'route': 'category'},
       {'icon': Icons.cake, 'label': 'Bakery', 'color': Colors.pink, 'route': 'category'},
-      {'icon': Icons.local_grocery_store, 'label': 'Grocery', 'color': Colors.teal, 'route': 'category'},
+     
+    {'icon': Icons.wine_bar, 'label': 'Wine', 'color': Colors.purple, 'route': 'category'},
+     
     ];
 
     return Container(
@@ -891,9 +910,13 @@ class _HomeScreenState extends State<HomeScreen> {
     // Filter stores based on current filter
     List<dynamic> filteredStores = _allStores;
     if (_currentFilter == 'stores') {
-      filteredStores = _allStores.where((store) => store['type'] == 'store').toList();
+      filteredStores = _allStores.where((store) => 
+        store['type'] == 'store' || store['vendorType'] == 'store'
+      ).toList();
     } else if (_currentFilter == 'restaurants') {
-      filteredStores = _allStores.where((store) => store['type'] == 'restaurant').toList();
+      filteredStores = _allStores.where((store) => 
+        store['type'] == 'restaurant' || store['vendorType'] == 'restaurant'
+      ).toList();
     }
     
     return Column(
@@ -1033,31 +1056,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 
-                // Favorite Heart Icon
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: GestureDetector(
-                    onTap: () async {
-                      // TODO: Implement favorites functionality
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('${isFavorited ? 'Removed from' : 'Added to'} favorites')),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        isFavorited ? Icons.favorite : Icons.favorite_border,
-                        color: isFavorited ? Colors.red : Colors.grey[600],
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                ),
                 
                 // Image Indicator
                 if (images.length > 1)
@@ -1218,176 +1216,226 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchBanners() async {
     print('🔍 HomeScreen: Fetching banners...');
-    setState(() => _loadingBanners = true);
+    if (!mounted) return;
+    
     try {
       final data = await ApiService.get('/banners');
       print('🔍 HomeScreen: Banners fetched successfully: ${data.length} banners');
-      setState(() {
-        _banners = data;
-        _loadingBanners = false;
-      });
+      if (mounted) {
+        setState(() {
+          _banners = data;
+          _loadingBanners = false;
+        });
+      }
     } catch (e) {
       print('❌ HomeScreen: Error fetching banners: $e');
       // Use mock data if API fails
-      setState(() {
-        _banners = [
-          {
-            'imageUrl': 'https://via.placeholder.com/400x200/FF6B35/FFFFFF?text=T-Mart+Express',
-            'title': 'T-Mart Express',
-            'subtitle': 'Get groceries delivered in 15-30 minutes'
-          },
-          {
-            'imageUrl': 'https://via.placeholder.com/400x200/4CAF50/FFFFFF?text=Fresh+Groceries',
-            'title': 'Fresh Groceries',
-            'subtitle': 'Quality products at best prices'
-          }
-        ];
-        _loadingBanners = false;
-      });
+      if (mounted) {
+        setState(() {
+          _banners = [
+            {
+              'imageUrl': 'https://via.placeholder.com/400x200/FF6B35/FFFFFF?text=T-Mart+Express',
+              'title': 'T-Mart Express',
+              'subtitle': 'Get groceries delivered in 15-30 minutes'
+            },
+            {
+              'imageUrl': 'https://via.placeholder.com/400x200/4CAF50/FFFFFF?text=Fresh+Groceries',
+              'title': 'Fresh Groceries',
+              'subtitle': 'Quality products at best prices'
+            }
+          ];
+          _loadingBanners = false;
+        });
+      }
     }
   }
 
   Future<void> _fetchCoupons() async {
-    setState(() => _loadingCoupons = true);
+    if (!mounted) return;
+    
     try {
       final data = await ApiService.get('/coupons');
-      setState(() {
-        _coupons = data;
-        _loadingCoupons = false;
-      });
+      if (mounted) {
+        setState(() {
+          _coupons = data;
+          _loadingCoupons = false;
+        });
+      }
     } catch (e) {
       print('❌ HomeScreen: Error fetching coupons: $e');
       // Use mock data if API fails
-      setState(() {
-        _coupons = [
-          {
-            'code': 'WELCOME20',
-            'discount': 20,
-            'description': 'First order discount'
-          },
-          {
-            'code': 'FRESH10',
-            'discount': 10,
-            'description': 'Fresh groceries discount'
-          }
-        ];
-        _loadingCoupons = false;
-      });
+      if (mounted) {
+        setState(() {
+          _coupons = [
+            {
+              'code': 'WELCOME20',
+              'discount': 20,
+              'description': 'First order discount'
+            },
+            {
+              'code': 'FRESH10',
+              'discount': 10,
+              'description': 'Fresh groceries discount'
+            }
+          ];
+          _loadingCoupons = false;
+        });
+      }
     }
   }
 
   Future<void> _fetchFeaturedStores() async {
-    setState(() {
-      _loadingFeaturedStores = true;
-      _errorFeaturedStores = null;
-    });
+    if (!mounted) return;
+    
     try {
+      // Use the correct endpoint for featured vendors
       final data = await ApiService.get('/auth/featured-vendors');
-      setState(() {
-        _featuredStores = data;
-        _loadingFeaturedStores = false;
-      });
+      print('🔍 HomeScreen: Featured stores fetched: ${data.length} stores');
+      
+      // Transform the data to match the expected structure
+      final transformedData = (data as List).map((store) {
+        return {
+          'storeName': store['storeName'] ?? store['name'] ?? 'Store',
+          'storeImage': store['storeImage'] ?? store['image'] ?? '',
+          'storeRating': store['storeRating'] ?? store['rating'] ?? 0.0,
+          'storeReviews': store['storeReviews'] ?? store['reviews'] ?? 0,
+          'vendorType': store['vendorType'] ?? 'store',
+          'vendorSubType': store['vendorSubType'] ?? store['storeCategory'] ?? 'Store',
+          'storeDescription': store['storeDescription'] ?? store['description'] ?? '',
+          'deliveryTime': store['deliveryTime'] ?? '30-45 min',
+          'deliveryFee': store['deliveryFee'] ?? '₹20',
+          'storeCoordinates': store['storeCoordinates'],
+          'storeTags': store['storeTags'] ?? [],
+          'type': store['vendorType'] ?? 'store',
+          'images': store['storeImages'] ?? [store['storeImage'] ?? ''],
+          'vendorId': store['_id'] ?? store['id'] ?? store['vendorId'] ?? '',
+          'id': store['_id'] ?? store['id'] ?? '',
+        };
+      }).toList();
+      
+      if (mounted) {
+        setState(() {
+          _featuredStores = transformedData;
+          _loadingFeaturedStores = false;
+        });
+      }
     } catch (e) {
       print('❌ HomeScreen: Error fetching featured stores: $e');
-      // Use mock data if API fails
-      setState(() {
-        _featuredStores = [
-          {
-            'name': 'Fresh Grocery Store',
-            'image': 'https://via.placeholder.com/150x150/4CAF50/FFFFFF?text=Grocery',
-            'rating': 4.5,
-            'deliveryTime': '15-30 min',
-            'deliveryFee': 'Free'
-          },
-          {
-            'name': 'Quick Mart',
-            'image': 'https://via.placeholder.com/150x150/FF9800/FFFFFF?text=Quick',
-            'rating': 4.2,
-            'deliveryTime': '20-35 min',
-            'deliveryFee': '₹20'
-          }
-        ];
-        _loadingFeaturedStores = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorFeaturedStores = e.toString();
+          _loadingFeaturedStores = false;
+        });
+      }
     }
   }
 
   Future<void> _fetchFeaturedRestaurants() async {
-    setState(() {
-      _loadingFeaturedRestaurants = true;
-      _errorFeaturedRestaurants = null;
-    });
+    if (!mounted) return;
+    
     try {
-      final data = await ApiService.get('/auth/featured-restaurants');
-      setState(() {
-        _featuredRestaurants = data;
-        _loadingFeaturedRestaurants = false;
-      });
+      // Get all vendors and filter for restaurants
+      final data = await ApiService.get('/auth/vendors');
+      print('🔍 HomeScreen: All vendors fetched: ${data.length} vendors');
+      
+      // Filter for restaurants and transform data
+      final allRestaurants = (data as List).where((vendor) {
+        final vendorType = vendor['vendorType']?.toString().toLowerCase() ?? '';
+        final storeTags = (vendor['storeTags'] as List<dynamic>? ?? []).map((tag) => tag.toString().toLowerCase()).toList();
+        
+        return vendorType.contains('restaurant') || 
+               storeTags.any((tag) => tag.contains('restaurant') || tag.contains('food') || tag.contains('dining'));
+      }).toList();
+      
+      // Select featured restaurants (first 4 or all if less than 4)
+      final restaurants = allRestaurants.take(4).map((restaurant) {
+        return {
+          'storeName': restaurant['storeName'] ?? restaurant['name'] ?? 'Restaurant',
+          'storeImage': restaurant['storeImage'] ?? restaurant['image'] ?? '',
+          'storeRating': restaurant['storeRating'] ?? restaurant['rating'] ?? 0.0,
+          'storeReviews': restaurant['storeReviews'] ?? restaurant['reviews'] ?? 0,
+          'vendorType': 'restaurant',
+          'vendorSubType': restaurant['vendorSubType'] ?? restaurant['storeCategory'] ?? 'Restaurant',
+          'storeDescription': restaurant['storeDescription'] ?? restaurant['description'] ?? '',
+          'deliveryTime': restaurant['deliveryTime'] ?? '30-45 min',
+          'deliveryFee': restaurant['deliveryFee'] ?? '₹30',
+          'storeCoordinates': restaurant['storeCoordinates'],
+          'storeTags': restaurant['storeTags'] ?? [],
+          'type': 'restaurant',
+          'images': restaurant['storeImages'] ?? [restaurant['storeImage'] ?? ''],
+          'vendorId': restaurant['_id'] ?? restaurant['id'] ?? restaurant['vendorId'] ?? '',
+          'id': restaurant['_id'] ?? restaurant['id'] ?? '',
+        };
+      }).toList();
+      
+      print('🔍 HomeScreen: Featured restaurants filtered: ${restaurants.length} restaurants');
+      
+      if (mounted) {
+        setState(() {
+          _featuredRestaurants = restaurants;
+          _loadingFeaturedRestaurants = false;
+        });
+      }
     } catch (e) {
       print('❌ HomeScreen: Error fetching featured restaurants: $e');
-      // Use mock data if API fails
-      setState(() {
-        _featuredRestaurants = [
-          {
-            'name': 'Pizza Palace',
-            'image': 'https://via.placeholder.com/150x150/FF5722/FFFFFF?text=Pizza',
-            'rating': 4.6,
-            'deliveryTime': '30-45 min',
-            'deliveryFee': '₹40'
-          },
-          {
-            'name': 'Burger House',
-            'image': 'https://via.placeholder.com/150x150/FF9800/FFFFFF?text=Burger',
-            'rating': 4.3,
-            'deliveryTime': '25-35 min',
-            'deliveryFee': '₹25'
-          }
-        ];
-        _loadingFeaturedRestaurants = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorFeaturedRestaurants = e.toString();
+          _loadingFeaturedRestaurants = false;
+        });
+      }
     }
   }
 
   Future<void> _fetchAllStores() async {
-    setState(() {
-      _loadingAllStores = true;
-      _errorAllStores = null;
-    });
+    if (!mounted) return;
+    
     try {
+      // Get all vendors
       final data = await ApiService.get('/auth/vendors');
-      setState(() {
-        _allStores = data;
-        _loadingAllStores = false;
-      });
+      print('🔍 HomeScreen: All stores fetched: ${data.length} stores');
+      
+      // Transform the data to match the expected structure
+      final transformedData = (data as List).map((store) {
+        final vendorType = store['vendorType']?.toString().toLowerCase() ?? 'store';
+        final isRestaurant = vendorType.contains('restaurant') || 
+                           (store['storeTags'] as List<dynamic>? ?? []).any((tag) => 
+                             tag.toString().toLowerCase().contains('restaurant') || 
+                             tag.toString().toLowerCase().contains('food'));
+        
+        return {
+          'storeName': store['storeName'] ?? store['name'] ?? 'Store',
+          'storeImage': store['storeImage'] ?? store['image'] ?? '',
+          'storeRating': store['storeRating'] ?? store['rating'] ?? 0.0,
+          'storeReviews': store['storeReviews'] ?? store['reviews'] ?? 0,
+          'vendorType': store['vendorType'] ?? 'store',
+          'vendorSubType': store['vendorSubType'] ?? store['storeCategory'] ?? 'Store',
+          'storeDescription': store['storeDescription'] ?? store['description'] ?? '',
+          'deliveryTime': store['deliveryTime'] ?? '30-45 min',
+          'deliveryFee': store['deliveryFee'] ?? '₹20',
+          'storeCoordinates': store['storeCoordinates'],
+          'storeTags': store['storeTags'] ?? [],
+          'type': isRestaurant ? 'restaurant' : 'store',
+          'images': store['storeImages'] ?? [store['storeImage'] ?? ''],
+          'vendorId': store['_id'] ?? store['id'] ?? store['vendorId'] ?? '',
+          'id': store['_id'] ?? store['id'] ?? '',
+        };
+      }).toList();
+      
+      if (mounted) {
+        setState(() {
+          _allStores = transformedData;
+          _loadingAllStores = false;
+        });
+      }
     } catch (e) {
       print('❌ HomeScreen: Error fetching all stores: $e');
-      // Use mock data if API fails
-      setState(() {
-        _allStores = [
-          {
-            'name': 'Super Market',
-            'image': 'https://via.placeholder.com/150x150/2196F3/FFFFFF?text=Super',
-            'rating': 4.3,
-            'deliveryTime': '25-40 min',
-            'deliveryFee': '₹30'
-          },
-          {
-            'name': 'Local Grocery',
-            'image': 'https://via.placeholder.com/150x150/9C27B0/FFFFFF?text=Local',
-            'rating': 4.1,
-            'deliveryTime': '15-25 min',
-            'deliveryFee': '₹15'
-          },
-          {
-            'name': 'Express Mart',
-            'image': 'https://via.placeholder.com/150x150/FF5722/FFFFFF?text=Express',
-            'rating': 4.4,
-            'deliveryTime': '10-20 min',
-            'deliveryFee': 'Free'
-          }
-        ];
-        _loadingAllStores = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorAllStores = e.toString();
+          _loadingAllStores = false;
+        });
+      }
     }
   }
 
@@ -1438,29 +1486,63 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-    if (_errorFeaturedStores != null) return const SizedBox.shrink();
+    if (_errorFeaturedStores != null) {
+      return Container(
+        height: 100,
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Failed to load featured stores', style: TextStyle(color: Colors.grey[600])),
+              TextButton(
+                onPressed: _fetchFeaturedStores,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     if (_featuredStores.isEmpty) return const SizedBox.shrink();
     return _buildFeaturedStores();
   }
 
   Widget _buildFeaturedRestaurantsWithRetry() {
-    if (_loadingFeaturedRestaurants) return const Center(child: CircularProgressIndicator());
-    if (_errorFeaturedRestaurants != null) return Center(
-      child: Column(
-        children: [
-          Text(_errorFeaturedRestaurants!, style: const TextStyle(color: Colors.red)),
-          TextButton(onPressed: _fetchFeaturedRestaurants, child: const Text('Retry')),
-        ],
+    if (_loadingFeaturedRestaurants) return Container(
+      height: 200,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[300],
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
       ),
     );
-    if (_featuredRestaurants.isEmpty) return Center(
-      child: Column(
-        children: [
-          const Text('No featured restaurants.'),
-          TextButton(onPressed: _fetchFeaturedRestaurants, child: const Text('Retry')),
-        ],
-      ),
-    );
+    if (_errorFeaturedRestaurants != null) {
+      return Container(
+        height: 100,
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Failed to load featured restaurants', style: TextStyle(color: Colors.grey[600])),
+              TextButton(
+                onPressed: _fetchFeaturedRestaurants,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_featuredRestaurants.isEmpty) return const SizedBox.shrink();
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1496,31 +1578,85 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: CachedImage(
-                          imageUrl: restaurant['restaurantImage'] ?? '',
-                          height: 120,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
+                      Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedImage(
+                              imageUrl: restaurant['storeImage'] ?? '',
+                              height: 120,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          // Restaurant type badge
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                '🍽️',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        restaurant['restaurantName'] ?? '',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              restaurant['storeName'] ?? '',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              restaurant['vendorSubType'] ?? 'Restaurant',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.star, color: Colors.orange, size: 16),
+                          const Icon(Icons.star, color: Colors.orange, size: 14),
                           const SizedBox(width: 4),
                           Text(
-                            (restaurant['restaurantRating'] ?? '').toString(),
-                            style: const TextStyle(fontWeight: FontWeight.w500),
+                            (restaurant['storeRating'] ?? '0.0').toString(),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '(${restaurant['storeReviews'] ?? '0'})',
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
@@ -1536,42 +1672,45 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildPopularNearYouWithRetry() {
-    return FutureBuilder<List<dynamic>>(
-      future: _fetchPopularNearYou(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
-            height: 200,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            child: Shimmer.fromColors(
-              baseColor: Colors.grey[300]!,
-              highlightColor: Colors.grey[100]!,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          );
-        }
-        
-        if (snapshot.hasError) {
-          return const SizedBox.shrink();
-        }
-        
-        final stores = snapshot.data ?? [];
-        
-        if (stores.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        
-        return _buildPopularNearYou();
-      },
+    if (_loadingPopularNearYou) return Container(
+      height: 200,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[300],
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
     );
+    if (_errorPopularNearYou != null) {
+      return Container(
+        height: 100,
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Failed to load popular stores', style: TextStyle(color: Colors.grey[600])),
+              TextButton(
+                onPressed: _fetchPopularNearYou,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_popularNearYou.isEmpty) return const SizedBox.shrink();
+    return _buildPopularNearYou();
   }
 
-  Future<List<dynamic>> _fetchPopularNearYou() async {
+  Future<void> _fetchPopularNearYou() async {
+    if (!mounted) return;
+    
     try {
       // Try to get nearby vendors first
       if (_currentPosition != null) {
@@ -1584,7 +1723,34 @@ class _HomeScreenState extends State<HomeScreen> {
           );
           if (nearbyStores.isNotEmpty) {
             print('✅ Found ${nearbyStores.length} nearby stores');
-            return nearbyStores;
+            // Transform the data to match expected structure
+            final transformedData = nearbyStores.map((store) {
+              return {
+                'storeName': store['storeName'] ?? store['name'] ?? 'Store',
+                'storeImage': store['storeImage'] ?? store['image'] ?? '',
+                'storeRating': store['storeRating'] ?? store['rating'] ?? 0.0,
+                'storeReviews': store['storeReviews'] ?? store['reviews'] ?? 0,
+                'vendorType': store['vendorType'] ?? 'store',
+                'vendorSubType': store['vendorSubType'] ?? store['storeCategory'] ?? 'Store',
+                'storeDescription': store['storeDescription'] ?? store['description'] ?? '',
+                'deliveryTime': store['deliveryTime'] ?? '30-45 min',
+                'deliveryFee': store['deliveryFee'] ?? '₹20',
+                'storeCoordinates': store['storeCoordinates'],
+                'storeTags': store['storeTags'] ?? [],
+                'type': store['vendorType'] ?? 'store',
+                'images': store['storeImages'] ?? [store['storeImage'] ?? ''],
+                'vendorId': store['_id'] ?? store['id'] ?? store['vendorId'] ?? '',
+                'id': store['_id'] ?? store['id'] ?? '',
+              };
+            }).toList();
+            
+            if (mounted) {
+              setState(() {
+                _popularNearYou = transformedData;
+                _loadingPopularNearYou = false;
+              });
+            }
+            return;
           } else {
             print('⚠️ No nearby stores found, using featured');
           }
@@ -1600,26 +1766,42 @@ class _HomeScreenState extends State<HomeScreen> {
       final featuredStores = await ApiService.get('/auth/featured-vendors');
       final stores = featuredStores is List ? featuredStores : [];
       print('✅ Found ${stores.length} featured stores');
-      return stores;
+      
+      // Transform the data to match expected structure
+      final transformedData = stores.map((store) {
+        return {
+          'storeName': store['storeName'] ?? store['name'] ?? 'Store',
+          'storeImage': store['storeImage'] ?? store['image'] ?? '',
+          'storeRating': store['storeRating'] ?? store['rating'] ?? 0.0,
+          'storeReviews': store['storeReviews'] ?? store['reviews'] ?? 0,
+          'vendorType': store['vendorType'] ?? 'store',
+          'vendorSubType': store['vendorSubType'] ?? store['storeCategory'] ?? 'Store',
+          'storeDescription': store['storeDescription'] ?? store['description'] ?? '',
+          'deliveryTime': store['deliveryTime'] ?? '30-45 min',
+          'deliveryFee': store['deliveryFee'] ?? '₹20',
+          'storeCoordinates': store['storeCoordinates'],
+          'storeTags': store['storeTags'] ?? [],
+          'type': store['vendorType'] ?? 'store',
+          'images': store['storeImages'] ?? [store['storeImage'] ?? ''],
+          'vendorId': store['_id'] ?? store['id'] ?? store['vendorId'] ?? '',
+          'id': store['_id'] ?? store['id'] ?? '',
+        };
+      }).toList();
+      
+      if (mounted) {
+        setState(() {
+          _popularNearYou = transformedData;
+          _loadingPopularNearYou = false;
+        });
+      }
     } catch (e) {
       print('❌ Error fetching popular near you: $e');
-      // Return mock data if API fails
-      return [
-        {
-          'name': 'Nearby Grocery',
-          'image': 'https://via.placeholder.com/150x150/4CAF50/FFFFFF?text=Nearby',
-          'rating': 4.2,
-          'deliveryTime': '10-15 min',
-          'deliveryFee': '₹10'
-        },
-        {
-          'name': 'Quick Stop',
-          'image': 'https://via.placeholder.com/150x150/FF9800/FFFFFF?text=Quick',
-          'rating': 4.0,
-          'deliveryTime': '15-20 min',
-          'deliveryFee': '₹15'
-        }
-      ];
+      if (mounted) {
+        setState(() {
+          _errorPopularNearYou = e.toString();
+          _loadingPopularNearYou = false;
+        });
+      }
     }
   }
 
@@ -1638,7 +1820,24 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-    if (_errorAllStores != null) return const SizedBox.shrink();
+    if (_errorAllStores != null) {
+      return Container(
+        height: 100,
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Failed to load stores', style: TextStyle(color: Colors.grey[600])),
+              TextButton(
+                onPressed: _fetchAllStores,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     if (_allStores.isEmpty) return const SizedBox.shrink();
     return _buildAllStores();
   }

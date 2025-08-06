@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:baato_maps/baato_maps.dart';
 import 'package:http/http.dart' as http;
@@ -39,6 +40,28 @@ class _MapPageState extends State<MapPage> {
     super.initState();
     _initializeControllers();
     _fetchPlaceCoordinates();
+    
+    // Set up periodic check for marker addition
+    _setupMarkerCheck();
+  }
+  
+  void _setupMarkerCheck() {
+    // Check every 500ms for 5 seconds to see if map controller becomes available
+    int attempts = 0;
+    Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      attempts++;
+      if (_mapController != null && _currentMarkerPosition != null && mounted) {
+        print('✅ Map controller and position available, adding marker');
+        _addMarkerAndAddress(
+          _currentMarkerPosition!,
+          widget.place.name ?? "Selected Location",
+        );
+        timer.cancel();
+      } else if (!mounted || attempts >= 10) { // Stop after 5 seconds (10 * 500ms)
+        print('⏰ Marker check timeout or widget disposed');
+        timer.cancel();
+      }
+    });
   }
 
   void _initializeControllers() {
@@ -99,10 +122,19 @@ class _MapPageState extends State<MapPage> {
           _originalLongitude = _longitude;
           
           _currentMarkerPosition = BaatoCoordinate(latitude: _latitude!, longitude: _longitude!);
-          _addMarkerAndAddress(
-            _currentMarkerPosition!,
-            widget.place.name ?? 'Selected Location',
-          );
+          
+          print('📍 Coordinates fetched: ${_latitude}, ${_longitude}');
+          
+          // Only add marker if map controller is ready
+          if (_mapController != null) {
+            print('🗺️ Map controller ready, adding marker');
+            _addMarkerAndAddress(
+              _currentMarkerPosition!,
+              widget.place.name ?? 'Selected Location',
+            );
+          } else {
+            print('⏳ Map controller not ready yet, will add marker when map is created');
+          }
           _clearLoading();
           return;
         }
@@ -118,11 +150,61 @@ class _MapPageState extends State<MapPage> {
 
   void _onMapCreated(BaatoMapController controller) {
     _mapController = controller;
+    print('🗺️ Map controller created');
+    
+    // Only add marker if we have coordinates
     if (_currentMarkerPosition != null) {
+      print('📍 Adding marker for existing position');
       _addMarkerAndAddress(
         _currentMarkerPosition!,
         widget.place.name ?? "Selected Location",
       );
+    } else {
+      print('⚠️ No marker position available when map was created');
+    }
+    
+    // Set up marker drag listener if available
+    _setupMarkerDragListener();
+  }
+  
+  // Method to check if we need to add a marker after map becomes ready
+  void _checkAndAddMarkerIfNeeded() {
+    if (_mapController != null && _currentMarkerPosition != null && mounted) {
+      print('🔍 Checking if marker needs to be added...');
+      _addMarkerAndAddress(
+        _currentMarkerPosition!,
+        widget.place.name ?? "Selected Location",
+      );
+    }
+  }
+  
+  void _setupMarkerDragListener() {
+    // Note: Baato maps may not have direct marker drag listeners
+    // The drag functionality is handled through the draggable property
+    // and we'll need to handle position updates through other means
+    // For now, we'll rely on the onTap functionality for position updates
+  }
+  
+  // Method to update marker position when user taps on map
+  void _updateMarkerPosition(BaatoCoordinate newPosition) {
+    if (!mounted) return;
+    
+    print('📍 Updating marker position to: ${newPosition.latitude}, ${newPosition.longitude}');
+    
+    setState(() {
+      _latitude = newPosition.latitude;
+      _longitude = newPosition.longitude;
+      _currentMarkerPosition = newPosition;
+    });
+    
+    // Update address for new position
+    _fetchAddress(newPosition.latitude, newPosition.longitude);
+    
+    // Show feedback that this is now a custom location
+    if (_isCustomLocation()) {
+      _showSnackBar("📍 Custom location selected", isError: false);
+    } else {
+      _showSnackBar("📍 Location updated", isError: false);
     }
   }
 
@@ -137,56 +219,112 @@ class _MapPageState extends State<MapPage> {
       });
 
   Future<void> _addMarkerAndAddress(BaatoCoordinate coord, String label) async {
-    try {
-      await _mapController?.markerManager.clearMarkers();
-      await _mapController?.markerManager.addMarker(
-        BaatoSymbolOption(
+    print('🎯 Attempting to add marker: $label at ${coord.latitude}, ${coord.longitude}');
+    
+    if (_mapController == null) {
+      print('❌ Map controller is null, cannot add marker');
+      return;
+    }
+    
+    if (!mounted) {
+      print('❌ Widget not mounted, cannot add marker');
+      return;
+    }
+    
+    // Retry mechanism for marker addition
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        print('🔄 Attempt $attempt: Adding marker...');
+        
+        // Add a small delay to ensure map controller is fully ready
+        await Future.delayed(Duration(milliseconds: 100 * attempt));
+        
+        print('🗑️ Clearing existing markers...');
+        await _mapController!.markerManager.clearMarkers();
+        
+        print('📍 Adding new marker...');
+        final markerOption = BaatoSymbolOption(
           geometry: coord,
           textField: label,
-          iconImage: "baato_marker",
-          iconSize: 1.5,
-          draggable: _isMarkerDraggable,
-        ),
-      );
-      await _fetchAddress(coord.latitude, coord.longitude);
-    } catch (e) {
-      print('❌ Error adding marker: $e');
-      _setError('Failed to display location on map.');
+          iconSize: 2.0, // Make it larger for better visibility
+          draggable: true, // Make marker draggable
+          textColor: "#FF0000", // Red text for better visibility
+          textHaloColor: "#FFFFFF", // White halo around text
+          textHaloWidth: 1.0, // Halo width
+        );
+        print('🎯 Marker option created: ${markerOption.textField} at ${markerOption.geometry?.latitude}, ${markerOption.geometry?.longitude}');
+        
+        await _mapController!.markerManager.addMarker(markerOption);
+        
+        print('✅ Marker added successfully on attempt $attempt');
+        
+        // Schedule map centering after a short delay
+        Timer(const Duration(milliseconds: 500), () {
+          if (mounted && _mapController != null) {
+            print('🎯 Scheduling map centering on marker');
+            // The map should already be centered since we set initialPosition
+          }
+        });
+        
+        await _fetchAddress(coord.latitude, coord.longitude);
+        return; // Success, exit the retry loop
+      } catch (e) {
+        print('❌ Error adding marker on attempt $attempt: $e');
+        if (attempt == 3) {
+          // Final attempt failed
+          if (mounted) {
+            _setError('Failed to display location on map after 3 attempts.');
+          }
+        } else {
+          // Wait before retry
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      }
     }
   }
 
-  Future<void> _onMarkerDragEnd(BaatoCoordinate newPosition) async {
+  // Method to handle marker drag events
+  void _onMarkerDragged(BaatoCoordinate newPosition) {
+    print('🎯 Marker dragged to: ${newPosition.latitude}, ${newPosition.longitude}');
+    
+    if (!mounted) return;
+    
     setState(() {
       _latitude = newPosition.latitude;
       _longitude = newPosition.longitude;
       _currentMarkerPosition = newPosition;
     });
     
-    await _fetchAddress(newPosition.latitude, newPosition.longitude);
+    // Fetch address for the new position
+    _fetchAddress(newPosition.latitude, newPosition.longitude);
+  }
+  
+  // Method to handle marker drag end
+  void _onMarkerDragEnd(BaatoCoordinate newPosition) {
+    print('🎯 Marker drag ended at: ${newPosition.latitude}, ${newPosition.longitude}');
     
-    // Update address controller if modal is open
-    _updateAddressControllerIfNeeded();
+    if (!mounted) return;
     
-    // Show a subtle indicator instead of intrusive snackbar
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.location_on, color: Colors.white, size: 14),
-              const SizedBox(width: 6),
-              const Text("Updated", style: TextStyle(fontSize: 12)),
-            ],
-          ),
-          backgroundColor: Colors.black87,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          duration: const Duration(milliseconds: 1500),
-          width: 120,
-        ),
-      );
+    setState(() {
+      _latitude = newPosition.latitude;
+      _longitude = newPosition.longitude;
+      _currentMarkerPosition = newPosition;
+    });
+    
+    try {
+      _fetchAddress(newPosition.latitude, newPosition.longitude);
+      
+      // Update address controller if modal is open
+      _updateAddressControllerIfNeeded();
+      
+      // Show feedback
+      if (_isCustomLocation()) {
+        _showSnackBar("📍 Custom location selected", isError: false);
+      } else {
+        _showSnackBar("📍 Location updated", isError: false);
+      }
+    } catch (e) {
+      print('❌ Error updating marker position: $e');
     }
   }
 
@@ -198,23 +336,54 @@ class _MapPageState extends State<MapPage> {
       _addressController.text = _currentAddress!;
     }
   }
+  
+  // Helper method to check if map is ready
+  bool get _isMapReady => _mapController != null && mounted;
 
   bool _isCustomLocation() {
-    return _latitude != null && _longitude != null &&
-           _originalLatitude != null && _originalLongitude != null &&
-           (_latitude != _originalLatitude || _longitude != _originalLongitude);
+    // A location is considered custom if:
+    // 1. We have current coordinates
+    // 2. We have original coordinates (from search)
+    // 3. Current coordinates are different from original coordinates
+    // 4. OR if the user tapped on the map to create a new marker
+    
+    if (_latitude == null || _longitude == null) {
+      return false;
+    }
+    
+    // If we have original coordinates, check if current position is different
+    if (_originalLatitude != null && _originalLongitude != null) {
+      final latDiff = (_latitude! - _originalLatitude!).abs();
+      final lonDiff = (_longitude! - _originalLongitude!).abs();
+      
+      // Consider it custom if coordinates differ by more than 0.0001 degrees (roughly 10 meters)
+      return latDiff > 0.0001 || lonDiff > 0.0001;
+    }
+    
+    // If no original coordinates, it might be a custom location created by tapping
+    // Check if the current address doesn't match the original place name
+    if (_currentAddress != null && widget.place.name != null) {
+      return !_currentAddress!.contains(widget.place.name!) && 
+             !widget.place.name!.contains(_currentAddress!);
+    }
+    
+    return false;
   }
 
   Future<void> _fetchAddress(double lat, double lon) async {
+    if (!mounted) return;
+    
     final url = 'https://api.baato.io/api/v1/reverse?key=$_baatoAccessToken&lat=$lat&lon=$lon';
     
     try {
       final response = await http.get(Uri.parse(url));
       
       if (response.statusCode != 200) {
-        setState(() {
-          _currentAddress = widget.place.name ?? 'Selected Location';
-        });
+        if (mounted) {
+          setState(() {
+            _currentAddress = widget.place.name ?? 'Selected Location';
+          });
+        }
         return;
       }
 
@@ -230,26 +399,30 @@ class _MapPageState extends State<MapPage> {
       // Check if this is a custom location (marker has been moved from original position)
       final isCustomLocation = _isCustomLocation();
 
-      setState(() {
-        if (isCustomLocation) {
-          // For custom locations, only use the fetched address without place name
-          _currentAddress = address ?? 'Selected Location';
-        } else {
-          // For searched locations, combine place name and address
-          _currentAddress = [widget.place.name, address]
-              .whereType<String>()
-              .where((s) => s.isNotEmpty)
-              .join('\n');
-        }
-      });
+      if (mounted) {
+        setState(() {
+          if (isCustomLocation) {
+            // For custom locations, only use the fetched address without place name
+            _currentAddress = address ?? 'Selected Location';
+          } else {
+            // For searched locations, combine place name and address
+            _currentAddress = [widget.place.name, address]
+                .whereType<String>()
+                .where((s) => s.isNotEmpty)
+                .join('\n');
+          }
+        });
+      }
       
       // Update the address controller if it's currently being used in a modal
       _updateAddressControllerIfNeeded();
     } catch (e) {
       print('❌ Error fetching address: $e');
-      setState(() {
-        _currentAddress = widget.place.name ?? 'Selected Location';
-      });
+      if (mounted) {
+        setState(() {
+          _currentAddress = widget.place.name ?? 'Selected Location';
+        });
+      }
       
       // Update the address controller if it's currently being used in a modal
       _updateAddressControllerIfNeeded();
@@ -326,8 +499,8 @@ class _MapPageState extends State<MapPage> {
       return;
     }
 
-    // Check if this is a custom location (not from search)
-    final isCustomLocation = !widget.place.name.contains(_currentAddress!);
+    // Check if this is a custom location (marker has been moved from original position)
+    final isCustomLocation = _isCustomLocation();
     
     String finalAddress = _currentAddress!;
     String instructions = '';
@@ -528,6 +701,10 @@ class _MapPageState extends State<MapPage> {
       return;
     }
 
+    // Check if this is a custom location
+    final isCustomLocation = _isCustomLocation();
+    print('📍 Save location - Is custom location: $isCustomLocation');
+
     // Initialize controllers with current values
     _labelController.clear();
     _addressController.text = _currentAddress ?? '';
@@ -551,9 +728,18 @@ class _MapPageState extends State<MapPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    "Save Location",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Row(
+                    children: [
+                      Icon(
+                        isCustomLocation ? Icons.edit_location : Icons.save,
+                        color: isCustomLocation ? Colors.orange : Colors.green,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isCustomLocation ? "Save Custom Location" : "Save Location",
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   Container(
@@ -565,7 +751,7 @@ class _MapPageState extends State<MapPage> {
                     child: Column(
                       children: [
                         Text(
-                          "Selected Location",
+                          isCustomLocation ? "Custom Location" : "Selected Location",
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 12,
@@ -578,6 +764,24 @@ class _MapPageState extends State<MapPage> {
                           style: const TextStyle(color: Colors.grey, fontSize: 12),
                           textAlign: TextAlign.center,
                         ),
+                        if (isCustomLocation) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              "Custom Location",
+                              style: TextStyle(
+                                color: Colors.orange[700],
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -715,8 +919,69 @@ class _MapPageState extends State<MapPage> {
         ),
       );
 
+  // Method to reset to original location
+  void _resetToOriginalLocation() {
+    if (_originalLatitude != null && _originalLongitude != null) {
+      print('🔄 Resetting to original location: $_originalLatitude, $_originalLongitude');
+      
+      setState(() {
+        _latitude = _originalLatitude;
+        _longitude = _originalLongitude;
+        _currentMarkerPosition = BaatoCoordinate(
+          latitude: _originalLatitude!,
+          longitude: _originalLongitude!,
+        );
+      });
+      
+      // Update marker and address
+      if (_isMapReady) {
+        _addMarkerAndAddress(
+          _currentMarkerPosition!,
+          widget.place.name ?? "Selected Location",
+        );
+      }
+      
+      _showSnackBar("📍 Reset to original location", isError: false);
+    }
+  }
+
+  // Method to move marker to a new location
+  void _moveMarkerToLocation(BaatoCoordinate newLocation) {
+    print('📍 Moving marker to: ${newLocation.latitude}, ${newLocation.longitude}');
+    
+    if (!mounted) return;
+    
+    // Update the current position
+    setState(() {
+      _latitude = newLocation.latitude;
+      _longitude = newLocation.longitude;
+      _currentMarkerPosition = newLocation;
+    });
+    
+    // Add marker at new location
+    _addMarkerAndAddress(newLocation, "Custom Location");
+    
+    // Fetch address for the new location
+    _fetchAddress(newLocation.latitude, newLocation.longitude);
+    
+    // Show feedback
+    if (_isCustomLocation()) {
+      _showSnackBar("📍 Custom location selected", isError: false);
+    } else {
+      _showSnackBar("📍 Location updated", isError: false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Debug information
+    if (_currentMarkerPosition != null) {
+      print('🗺️ Map Debug - Current: ${_currentMarkerPosition!.latitude}, ${_currentMarkerPosition!.longitude}');
+      print('🗺️ Map Debug - Original: $_originalLatitude, $_originalLongitude');
+      print('🗺️ Map Debug - Is Custom: ${_isCustomLocation()}');
+      print('🗺️ Map Debug - Address: $_currentAddress');
+    }
+    
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
@@ -817,18 +1082,71 @@ class _MapPageState extends State<MapPage> {
             style: BaatoMapStyle.breeze,
             initialZoom: 16,
             initialPosition: _currentMarkerPosition ?? BaatoCoordinate(
-              latitude: _latitude!, 
-              longitude: _longitude!
+              latitude: _latitude ?? 27.7172, 
+              longitude: _longitude ?? 85.324
             ),
             onMapCreated: _onMapCreated,
             onTap: (point, coord, feature) {
-              _addMarkerAndAddress(coord, "Custom Location");
-              _onMarkerDragEnd(coord);
+              print('🎯 Map tapped at: ${coord.latitude}, ${coord.longitude}');
+              if (_isMapReady) {
+                // Move marker to the tapped location
+                _moveMarkerToLocation(coord);
+              } else {
+                print('⚠️ Map not ready for marker movement');
+              }
             },
             logoViewMargins: const Point(-50, -50),
           ),
           // Only show attribution for non-custom locations
           if (!_isCustomLocation()) _buildAttribution(),
+          // Add a simple overlay to show marker position
+          if (_currentMarkerPosition != null)
+            Positioned(
+              top: MediaQuery.of(context).size.height / 2 - 50,
+              left: MediaQuery.of(context).size.width / 2 - 25,
+              child: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.8),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: const Icon(
+                  Icons.location_on,
+                  color: Colors.white,
+                  size: 30,
+                ),
+              ),
+            ),
+          // Add tap hint overlay
+          Positioned(
+            top: 100,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.touch_app, color: Colors.white, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    "Tap anywhere to move marker",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           Align(
             alignment: Alignment.bottomCenter,
             child: _currentAddress != null
@@ -846,6 +1164,32 @@ class _MapPageState extends State<MapPage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Show custom location indicator
+                          if (_isCustomLocation())
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.edit_location, color: Colors.orange[700], size: 16),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "Custom Location",
+                                    style: TextStyle(
+                                      color: Colors.orange[700],
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           Text(
                             _currentAddress!,
                             textAlign: TextAlign.center,
@@ -866,10 +1210,10 @@ class _MapPageState extends State<MapPage> {
                                           color: Colors.white,
                                         ),
                                       )
-                                    : const Icon(Icons.save),
-                                label: Text(_isSaving ? "Saving..." : "Save Location"),
+                                    : Icon(_isCustomLocation() ? Icons.edit_location : Icons.save),
+                                label: Text(_isSaving ? "Saving..." : (_isCustomLocation() ? "Save Custom" : "Save Location")),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFF6B35),
+                                  backgroundColor: _isCustomLocation() ? Colors.orange : const Color(0xFFFF6B35),
                                   foregroundColor: Colors.white,
                                   disabledBackgroundColor: Colors.grey,
                                 ),
@@ -885,6 +1229,16 @@ class _MapPageState extends State<MapPage> {
                                   disabledBackgroundColor: Colors.grey,
                                 ),
                               ),
+                              // Add reset button for custom locations
+                              if (_isCustomLocation() && _originalLatitude != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: IconButton(
+                                    onPressed: _resetToOriginalLocation,
+                                    icon: const Icon(Icons.refresh, color: Colors.blue),
+                                    tooltip: "Reset to original location",
+                                  ),
+                                ),
                             ],
                           ),
                         ],

@@ -1,391 +1,315 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const User = require('./src/models/User');
-const Rider = require('./src/models/Rider');
+const axios = require('axios');
 require('dotenv').config();
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/tuukatuu', {
+// Import models
+const User = require('./src/models/User');
+const Product = require('./src/models/Product');
+
+// --- YOUR PEXELS API KEY ---
+const PEXELS_API_KEY = 'BIar0nsHgTUJXsg5xbZWUWX04X60kKXukCK5Q1Mt33rh9zYMvpHyXdsp';
+
+// --- Connect to the SAME DATABASE as your vendor script ---
+const MONGODB_URI = 'mongodb+srv://testbuddy1221:jaysi123@cluster0.1bjhspl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
 
-const seedRiders = async () => {
+// --- Function to fetch a relevant image from Pexels ---
+const fetchPexelsImage = async (query, size = 'large') => {
+  if (!PEXELS_API_KEY) {
+    console.warn("Pexels API key not set correctly. Using placeholder image.");
+    return `https://placehold.co/600x400?text=${query}`;
+  }
+
   try {
-    console.log('🌱 Starting rider seeding...');
-
-    // Create rider users first
-    const riderUsers = [
-      {
-        name: 'Rahul Kumar',
-        email: 'rahul.rider@example.com',
-        phone: '9876543210',
-        password: await bcrypt.hash('password123', 10),
-        role: 'rider'
+    const response = await axios.get('https://api.pexels.com/v1/search', {
+      params: {
+        query: query,
+        per_page: 1,
+        orientation: 'landscape',
       },
-      {
-        name: 'Amit Singh',
-        email: 'amit.rider@example.com',
-        phone: '9876543211',
-        password: await bcrypt.hash('password123', 10),
-        role: 'rider'
+      headers: {
+        Authorization: PEXELS_API_KEY,
       },
-      {
-        name: 'Priya Sharma',
-        email: 'priya.rider@example.com',
-        phone: '9876543212',
-        password: await bcrypt.hash('password123', 10),
-        role: 'rider'
-      },
-      {
-        name: 'Vikram Patel',
-        email: 'vikram.rider@example.com',
-        phone: '9876543213',
-        password: await bcrypt.hash('password123', 10),
-        role: 'rider'
-      },
-      {
-        name: 'Sneha Reddy',
-        email: 'sneha.rider@example.com',
-        phone: '9876543214',
-        password: await bcrypt.hash('password123', 10),
-        role: 'rider'
-      }
-    ];
+    });
 
-    // Clear existing rider users
-    await User.deleteMany({ role: 'rider' });
-    console.log('🗑️  Cleared existing rider users');
-
-    // Create rider users
-    const createdUsers = await User.insertMany(riderUsers);
-    console.log(`✅ Created ${createdUsers.length} rider users`);
-
-    // Create rider profiles
-    const riderProfiles = [
-      {
-        userId: createdUsers[0]._id,
-        profile: {
-          fullName: 'Rahul Kumar',
-          email: 'rahul.rider@example.com',
-          phone: '9876543210',
-          gender: 'male',
-          emergencyContact: {
-            name: 'Priya Kumar',
-            phone: '9876543215',
-            relationship: 'Wife'
-          }
-        },
-        vehicle: {
-          type: 'bike',
-          brand: 'Honda',
-          model: 'Activa 6G',
-          year: 2022,
-          color: 'Black',
-          licensePlate: 'DL01AB1234'
-        },
-        documents: {
-          drivingLicense: {
-            number: 'DL0120201234567',
-            expiryDate: new Date('2025-12-31')
-          }
-        },
-        currentLocation: {
-          coordinates: [77.2090, 28.6139], // Connaught Place, Delhi
-          address: 'Connaught Place, New Delhi'
-        },
-        status: 'online',
-        workPreferences: {
-          isAvailable: true,
-          workingHours: { start: '08:00', end: '20:00' },
-          preferredAreas: ['Connaught Place', 'Khan Market', 'Lajpat Nagar'],
-          maxDistance: 8
-        },
-        verification: {
-          isVerified: true,
-          isApproved: true,
-          submittedAt: new Date('2024-01-01'),
-          approvedAt: new Date('2024-01-02')
-        },
-        earnings: {
-          totalEarnings: 12500,
-          thisWeek: 1800,
-          thisMonth: 6500,
-          walletBalance: 1200
-        },
-        performance: {
-          totalDeliveries: 156,
-          completedDeliveries: 148,
-          cancelledDeliveries: 8,
-          averageRating: 4.7,
-          totalReviews: 142,
-          onTimeDeliveries: 135,
-          lateDeliveries: 13
-        }
-      },
-      {
-        userId: createdUsers[1]._id,
-        profile: {
-          fullName: 'Amit Singh',
-          email: 'amit.rider@example.com',
-          phone: '9876543211',
-          gender: 'male',
-          emergencyContact: {
-            name: 'Sunita Singh',
-            phone: '9876543216',
-            relationship: 'Sister'
-          }
-        },
-        vehicle: {
-          type: 'scooter',
-          brand: 'TVS',
-          model: 'Jupiter',
-          year: 2021,
-          color: 'Blue',
-          licensePlate: 'DL02CD5678'
-        },
-        documents: {
-          drivingLicense: {
-            number: 'DL0120207654321',
-            expiryDate: new Date('2026-06-30')
-          }
-        },
-        currentLocation: {
-          coordinates: [77.2167, 28.7041], // Khan Market, Delhi
-          address: 'Khan Market, New Delhi'
-        },
-        status: 'online',
-        workPreferences: {
-          isAvailable: true,
-          workingHours: { start: '09:00', end: '21:00' },
-          preferredAreas: ['Khan Market', 'South Extension', 'Greater Kailash'],
-          maxDistance: 10
-        },
-        verification: {
-          isVerified: true,
-          isApproved: true,
-          submittedAt: new Date('2024-01-01'),
-          approvedAt: new Date('2024-01-02')
-        },
-        earnings: {
-          totalEarnings: 9800,
-          thisWeek: 1200,
-          thisMonth: 4800,
-          walletBalance: 800
-        },
-        performance: {
-          totalDeliveries: 124,
-          completedDeliveries: 118,
-          cancelledDeliveries: 6,
-          averageRating: 4.5,
-          totalReviews: 110,
-          onTimeDeliveries: 105,
-          lateDeliveries: 13
-        }
-      },
-      {
-        userId: createdUsers[2]._id,
-        profile: {
-          fullName: 'Priya Sharma',
-          email: 'priya.rider@example.com',
-          phone: '9876543212',
-          gender: 'female',
-          emergencyContact: {
-            name: 'Rajesh Sharma',
-            phone: '9876543217',
-            relationship: 'Brother'
-          }
-        },
-        vehicle: {
-          type: 'bicycle',
-          brand: 'Hero',
-          model: 'Urban Trail',
-          year: 2023,
-          color: 'Red',
-          licensePlate: null
-        },
-        documents: {
-          drivingLicense: {
-            number: 'DL0120209876543',
-            expiryDate: new Date('2027-03-15')
-          }
-        },
-        currentLocation: {
-          coordinates: [77.2089, 28.5562], // Lajpat Nagar, Delhi
-          address: 'Lajpat Nagar, New Delhi'
-        },
-        status: 'online',
-        workPreferences: {
-          isAvailable: true,
-          workingHours: { start: '07:00', end: '19:00' },
-          preferredAreas: ['Lajpat Nagar', 'Defence Colony', 'Hauz Khas'],
-          maxDistance: 5
-        },
-        verification: {
-          isVerified: true,
-          isApproved: true,
-          submittedAt: new Date('2024-01-01'),
-          approvedAt: new Date('2024-01-02')
-        },
-        earnings: {
-          totalEarnings: 7200,
-          thisWeek: 900,
-          thisMonth: 3600,
-          walletBalance: 600
-        },
-        performance: {
-          totalDeliveries: 89,
-          completedDeliveries: 85,
-          cancelledDeliveries: 4,
-          averageRating: 4.8,
-          totalReviews: 78,
-          onTimeDeliveries: 82,
-          lateDeliveries: 3
-        }
-      },
-      {
-        userId: createdUsers[3]._id,
-        profile: {
-          fullName: 'Vikram Patel',
-          email: 'vikram.rider@example.com',
-          phone: '9876543213',
-          gender: 'male',
-          emergencyContact: {
-            name: 'Meera Patel',
-            phone: '9876543218',
-            relationship: 'Wife'
-          }
-        },
-        vehicle: {
-          type: 'car',
-          brand: 'Maruti',
-          model: 'Swift',
-          year: 2020,
-          color: 'White',
-          licensePlate: 'DL03EF9012'
-        },
-        documents: {
-          drivingLicense: {
-            number: 'DL0120204567890',
-            expiryDate: new Date('2028-09-20')
-          }
-        },
-        currentLocation: {
-          coordinates: [77.1025, 28.4595], // Greater Noida
-          address: 'Greater Noida, Uttar Pradesh'
-        },
-        status: 'offline',
-        workPreferences: {
-          isAvailable: false,
-          workingHours: { start: '10:00', end: '22:00' },
-          preferredAreas: ['Greater Noida', 'Noida', 'Ghaziabad'],
-          maxDistance: 15
-        },
-        verification: {
-          isVerified: true,
-          isApproved: true,
-          submittedAt: new Date('2024-01-01'),
-          approvedAt: new Date('2024-01-02')
-        },
-        earnings: {
-          totalEarnings: 15800,
-          thisWeek: 0,
-          thisMonth: 7200,
-          walletBalance: 1500
-        },
-        performance: {
-          totalDeliveries: 203,
-          completedDeliveries: 195,
-          cancelledDeliveries: 8,
-          averageRating: 4.6,
-          totalReviews: 185,
-          onTimeDeliveries: 178,
-          lateDeliveries: 17
-        }
-      },
-      {
-        userId: createdUsers[4]._id,
-        profile: {
-          fullName: 'Sneha Reddy',
-          email: 'sneha.rider@example.com',
-          phone: '9876543214',
-          gender: 'female',
-          emergencyContact: {
-            name: 'Arjun Reddy',
-            phone: '9876543219',
-            relationship: 'Husband'
-          }
-        },
-        vehicle: {
-          type: 'bike',
-          brand: 'Bajaj',
-          model: 'Pulsar 150',
-          year: 2021,
-          color: 'Silver',
-          licensePlate: 'DL04GH3456'
-        },
-        documents: {
-          drivingLicense: {
-            number: 'DL0120202345678',
-            expiryDate: new Date('2026-11-10')
-          }
-        },
-        currentLocation: {
-          coordinates: [77.1861, 28.7041], // Dwarka, Delhi
-          address: 'Dwarka, New Delhi'
-        },
-        status: 'online',
-        workPreferences: {
-          isAvailable: true,
-          workingHours: { start: '08:30', end: '20:30' },
-          preferredAreas: ['Dwarka', 'Janakpuri', 'Rajouri Garden'],
-          maxDistance: 12
-        },
-        verification: {
-          isVerified: true,
-          isApproved: true,
-          submittedAt: new Date('2024-01-01'),
-          approvedAt: new Date('2024-01-02')
-        },
-        earnings: {
-          totalEarnings: 11200,
-          thisWeek: 1500,
-          thisMonth: 5800,
-          walletBalance: 1000
-        },
-        performance: {
-          totalDeliveries: 167,
-          completedDeliveries: 160,
-          cancelledDeliveries: 7,
-          averageRating: 4.9,
-          totalReviews: 152,
-          onTimeDeliveries: 155,
-          lateDeliveries: 5
-        }
-      }
-    ];
-
-    // Clear existing rider profiles
-    await Rider.deleteMany({});
-    console.log('🗑️  Cleared existing rider profiles');
-
-    // Create rider profiles
-    const createdRiders = await Rider.insertMany(riderProfiles);
-    console.log(`✅ Created ${createdRiders.length} rider profiles`);
-
-    console.log('🎉 Rider seeding completed successfully!');
-    console.log('\n📊 Rider Summary:');
-    console.log(`- Total Riders: ${createdRiders.length}`);
-    console.log(`- Online Riders: ${createdRiders.filter(r => r.status === 'online').length}`);
-    console.log(`- Total Earnings: ₹${createdRiders.reduce((sum, r) => sum + r.earnings.totalEarnings, 0)}`);
-    console.log(`- Average Rating: ${(createdRiders.reduce((sum, r) => sum + r.performance.averageRating, 0) / createdRiders.length).toFixed(1)}`);
-
-    process.exit(0);
+    if (response.data && response.data.photos && response.data.photos.length > 0) {
+      const photo = response.data.photos[0];
+      return photo.src[size];
+    } else {
+      console.warn(`⚠️ No image found for query: ${query}. Using placeholder.`);
+      return `https://placehold.co/600x400?text=${query}`;
+    }
   } catch (error) {
-    console.error('❌ Error seeding riders:', error);
-    process.exit(1);
+    console.error(`❌ Error fetching image for '${query}':`, error.message);
+    return `https://placehold.co/600x400?text=Image+Error`;
   }
 };
 
-// Run the seeding
-seedRiders(); 
+const generateRandomPhoneNumber = () => {
+  const prefix = '98';
+  const min = 10000000;
+  const max = 99999999;
+  const uniqueNumber = Math.floor(Math.random() * (max - min + 1)) + min;
+  return `${prefix}${uniqueNumber}`;
+};
+
+const vendorsData = [
+  // Grocery Vendors
+  {
+    name: 'Fresh Harvest Grocers',
+    email: 'freshharvest@grocery.com',
+    storeName: 'Fresh Harvest Grocers',
+    storeDescription: 'Locally sourced organic produce and high-quality gourmet goods.',
+    vendorType: 'store',
+    vendorSubType: 'grocery',
+  },
+  {
+    name: 'Daily Essentials Supermarket',
+    email: 'dailyessentials@grocery.com',
+    storeName: 'Daily Essentials Supermarket',
+    storeDescription: 'Your one-stop shop for fresh food and household necessities.',
+    vendorType: 'store',
+    vendorSubType: 'supermarket',
+  },
+  {
+    name: 'Green Earth Organic Market',
+    email: 'greenearth@organic.com',
+    storeName: 'Green Earth Organic Market',
+    storeDescription: 'Supporting local farmers with the best in organic and natural products.',
+    vendorType: 'store',
+    vendorSubType: 'organic_market',
+  },
+  {
+    name: 'QuickBuy Mart',
+    email: 'quickbuymart@grocery.com',
+    storeName: 'QuickBuy Mart',
+    storeDescription: 'Fast and convenient grocery delivery right to your door.',
+    vendorType: 'store',
+    vendorSubType: 'grocery',
+  },
+
+  // Wine Vendors
+  {
+    name: 'The Wine Cellar',
+    email: 'winecellar@wine.com',
+    storeName: 'The Wine Cellar',
+    storeDescription: 'A curated selection of fine wines from around the world.',
+    vendorType: 'store',
+    vendorSubType: 'wine',
+  },
+  {
+    name: 'Vintage Vintners',
+    email: 'vintagevintners@wine.com',
+    storeName: 'Vintage Vintners',
+    storeDescription: 'Hand-picked vintage wines for every special occasion.',
+    vendorType: 'store',
+    vendorSubType: 'wine',
+  },
+  {
+    name: 'Grapevine Liquor Store',
+    email: 'grapevine@wine.com',
+    storeName: 'Grapevine Liquor Store',
+    storeDescription: 'Affordable and quality wines, beers, and spirits.',
+    vendorType: 'store',
+    vendorSubType: 'wine',
+  },
+  {
+    name: 'Cork & Bottle',
+    email: 'corkandbottle@wine.com',
+    storeName: 'Cork & Bottle',
+    storeDescription: 'Your neighborhood destination for unique and craft spirits.',
+    vendorType: 'store',
+    vendorSubType: 'wine',
+  },
+
+  // Bakery Vendors
+  {
+    name: 'Sweet Dreams Bakery',
+    email: 'sweetdreams@bakery.com',
+    storeName: 'Sweet Dreams Bakery',
+    storeDescription: 'Artisanal breads, pastries, and cakes made with love and fresh ingredients.',
+    vendorType: 'store',
+    vendorSubType: 'bakery',
+  },
+  {
+    name: 'Golden Crust Bakery',
+    email: 'goldencrust@bakery.com',
+    storeName: 'Golden Crust Bakery',
+    storeDescription: 'Traditional and modern baked goods for every occasion.',
+    vendorType: 'store',
+    vendorSubType: 'bakery',
+  },
+  {
+    name: 'Fresh Bites Bakery',
+    email: 'freshbites@bakery.com',
+    storeName: 'Fresh Bites Bakery',
+    storeDescription: 'Freshly baked breads and pastries delivered to your doorstep.',
+    vendorType: 'store',
+    vendorSubType: 'bakery',
+  },
+  {
+    name: 'Cake & Bake Studio',
+    email: 'cakeandbake@bakery.com',
+    storeName: 'Cake & Bake Studio',
+    storeDescription: 'Custom cakes, cupcakes, and specialty desserts for celebrations.',
+    vendorType: 'store',
+    vendorSubType: 'bakery',
+  },
+];
+
+const productsData = {
+  grocery: [
+    { name: 'Organic Apples', category: 'Grocery', unit: '1 kg' },
+    { name: 'Whole Wheat Bread', category: 'Grocery', unit: '1 loaf' },
+    { name: 'Free-Range Eggs', category: 'Grocery', unit: '1 dozen' },
+    { name: 'Fresh Tomatoes', category: 'Grocery', unit: '1 kg' },
+    { name: 'Cooking Oil', category: 'Grocery', unit: '1 liter' },
+    { name: 'Basmati Rice', category: 'Grocery', unit: '5 kg' },
+    { name: 'Bottled Water', category: 'Grocery', unit: '1 liter' },
+    { name: 'Milk Carton', category: 'Grocery', unit: '1 liter' },
+    { name: 'Chicken Breast', category: 'Grocery', unit: '500g' },
+    { name: 'Lentils', category: 'Grocery', unit: '500g' },
+  ],
+  wine: [
+    { name: 'Cabernet Sauvignon', category: 'wine', unit: '1 bottle' },
+    { name: 'Sauvignon Blanc', category: 'wine', unit: '1 bottle' },
+    { name: 'Merlot', category: 'wine', unit: '1 bottle' },
+    { name: 'Chardonnay', category: 'wine', unit: '1 bottle' },
+    { name: 'Pinot Noir', category: 'wine', unit: '1 bottle' },
+    { name: 'Prosecco', category: 'wine', unit: '1 bottle' },
+    { name: 'Local Craft Beer', category: 'wine', unit: '1 six-pack' },
+    { name: 'Tequila', category: 'wine', unit: '1 bottle' },
+    { name: 'Vodka', category: 'wine', unit: '1 bottle' },
+    { name: 'Gin', category: 'wine', unit: '1 bottle' },
+  ],
+  bakery: [
+    { name: 'Sourdough Bread', category: 'Bakery', unit: '1 loaf' },
+    { name: 'Croissants', category: 'Bakery', unit: '6 pieces' },
+    { name: 'Chocolate Cake', category: 'Bakery', unit: '1 cake' },
+    { name: 'Blueberry Muffins', category: 'Bakery', unit: '6 pieces' },
+    { name: 'Whole Wheat Bread', category: 'Bakery', unit: '1 loaf' },
+    { name: 'Chocolate Chip Cookies', category: 'Bakery', unit: '12 pieces' },
+    { name: 'Cinnamon Rolls', category: 'Bakery', unit: '6 pieces' },
+    { name: 'Birthday Cake', category: 'Bakery', unit: '1 cake' },
+    { name: 'French Baguette', category: 'Bakery', unit: '1 piece' },
+    { name: 'Donuts', category: 'Bakery', unit: '6 pieces' },
+  ],
+};
+
+async function seedGroceryAndWine() {
+  try {
+    console.log('🧹 Clearing existing grocery, wine, and bakery data...');
+    // Clear old data to prevent duplicates
+    const vendorSubtypesToDelete = ['grocery', 'supermarket', 'organic_market', 'wine', 'bakery'];
+    await User.deleteMany({ role: 'vendor', vendorSubType: { $in: vendorSubtypesToDelete } });
+    await Product.deleteMany({ vendorSubType: { $in: vendorSubtypesToDelete } });
+    console.log('✅ Old data cleared.');
+
+    console.log('---');
+    console.log('🏪 Seeding new vendors...');
+
+    const createdVendors = [];
+    for (const vendorData of vendorsData) {
+      const vendorPayload = {
+        ...vendorData,
+        phone: generateRandomPhoneNumber(),
+        password: await bcrypt.hash('password123', 10),
+        role: 'vendor',
+        storeImage: await fetchPexelsImage(`${vendorData.storeName} storefront`),
+        storeBanner: await fetchPexelsImage(`${vendorData.storeName} interior`),
+        storeTags: vendorData.vendorType === 'store' ? ['shop', 'local', vendorData.vendorSubType] : [],
+        storeCategories: vendorData.vendorType === 'store' ? [vendorData.vendorSubType] : [],
+        storeRating: (Math.random() * (5.0 - 4.0) + 4.0).toFixed(1),
+        storeReviews: Math.floor(Math.random() * 500) + 50,
+        isFeatured: Math.random() > 0.5,
+        storeCoordinates: {
+          latitude: 27.7 + (Math.random() * 0.5),
+          longitude: 85.3 + (Math.random() * 0.5)
+        },
+        storeAddress: ['Thamel, Kathmandu', 'Baneshwor, Kathmandu', 'Patan, Lalitpur'][Math.floor(Math.random() * 3)],
+      };
+
+      const existingVendor = await User.findOne({ email: vendorPayload.email });
+
+      if (!existingVendor) {
+        const vendor = new User(vendorPayload);
+        await vendor.save();
+        createdVendors.push(vendor);
+        console.log(`✅ Created vendor: ${vendor.storeName}`);
+      } else {
+        console.log(`⚠️ Vendor already exists: ${existingVendor.storeName}`);
+        createdVendors.push(existingVendor);
+      }
+    }
+
+    console.log('---');
+    console.log('🛍️ Seeding products for new vendors...');
+
+    for (const vendor of createdVendors) {
+      let productList = [];
+      if (vendor.vendorSubType === 'wine') {
+        productList = productsData.wine;
+      } else if (vendor.vendorSubType === 'bakery') {
+        productList = productsData.bakery;
+      } else {
+        productList = productsData.grocery;
+      }
+
+      for (const productInfo of productList) {
+        const productData = {
+          name: productInfo.name,
+          price: Math.floor(Math.random() * (1000 - 50) + 50),
+          imageUrl: await fetchPexelsImage(productInfo.name),
+          category: productInfo.category,
+          description: `${productInfo.name} available at ${vendor.storeName}.`,
+          unit: productInfo.unit,
+          deliveryTime: '20 mins',
+          isAvailable: true,
+          deliveryFee: 20,
+          stock: Math.floor(Math.random() * 100) + 20,
+          vendorId: vendor._id,
+          vendorType: vendor.vendorType,
+          vendorSubType: vendor.vendorSubType,
+          rating: (Math.random() * (5.0 - 4.0) + 4.0).toFixed(1),
+          reviews: Math.floor(Math.random() * 100) + 10,
+          isPopular: Math.random() > 0.5,
+          isFeatured: Math.random() > 0.7,
+          tags: [productInfo.category, vendor.vendorSubType],
+        };
+
+        const existingProduct = await Product.findOne({
+          name: productData.name,
+          vendorId: vendor._id
+        });
+
+        if (!existingProduct) {
+          const product = new Product(productData);
+          await product.save();
+          console.log(`✅ Created product: ${product.name} for ${vendor.storeName}`);
+        } else {
+          console.log(`⚠️ Product already exists: ${existingProduct.name}`);
+        }
+      }
+    }
+
+    console.log('---');
+    const finalVendorsCount = await User.countDocuments({ vendorSubType: { $in: vendorSubtypesToDelete } });
+    const finalProductsCount = await Product.countDocuments({ vendorSubType: { $in: vendorSubtypesToDelete } });
+    console.log('\n🎉 Grocery and Wine seeding completed!');
+    console.log('\nSummary:');
+    console.log(`- Vendors Created: ${finalVendorsCount}`);
+    console.log(`- Products Created: ${finalProductsCount}`);
+
+    process.exit(0);
+
+  } catch (error) {
+    console.error('❌ Error during seeding process:', error);
+    process.exit(1);
+  }
+}
+
+seedGroceryAndWine();
