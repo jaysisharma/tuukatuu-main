@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { shuffleVendors } = require('../utils/shuffleUtils');
 
 exports.getAllUsers = async (role, search) => {
   const query = {};
@@ -28,7 +29,8 @@ exports.updateUserRole = async (id, role) => {
   return await User.findByIdAndUpdate(id, { role }, { new: true }).select('-password');
 };
 
-exports.getVendors = async (search) => {
+exports.getVendors = async (search, options = {}) => {
+  const { shuffle = true } = options;
   const query = { role: 'vendor' };
   if (search) {
     query.$or = [
@@ -38,7 +40,17 @@ exports.getVendors = async (search) => {
       { storeName: { $regex: search, $options: 'i' } },
     ];
   }
-  return await User.find(query).select('-password');
+  let vendors = await User.find(query).select('-password');
+  
+  if (shuffle) {
+    vendors = shuffleVendors(vendors, {
+      prioritizeFeatured: true,
+      maintainQualityOrder: true,
+      considerRating: true
+    });
+  }
+  
+  return vendors;
 };
 
 exports.approveVendor = async (id) => {

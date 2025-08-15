@@ -61,7 +61,7 @@ const Categories = () => {
         ...(filter !== 'all' && { [filter]: true })
       });
 
-      const response = await api.get(`/categories?${params}`);
+      const response = await api.get(`/admin/categories?${params}`);
       setCategories(response.data);
       setTotalPages(response.pagination.pages);
     } catch (error) {
@@ -74,7 +74,7 @@ const Categories = () => {
 
   const loadStats = async () => {
     try {
-      const response = await api.get('/categories/stats');
+      const response = await api.get('/admin/categories/stats');
       setStats(response.data);
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -87,7 +87,7 @@ const Categories = () => {
       const formData = new FormData();
       formData.append('image', file);
       
-      const response = await api.upload('/categories/upload-image', formData);
+      const response = await api.upload('/admin/categories/upload-image', formData);
       
       setCombinedData(prev => ({
         ...prev,
@@ -123,7 +123,7 @@ const Categories = () => {
       const formData = new FormData();
       formData.append('image', file);
       
-      const response = await api.upload(`/categories/${categoryId}/upload-image`, formData);
+      const response = await api.upload(`/admin/categories/${categoryId}/upload-image`, formData);
       
       setEditingCategoryData(prev => ({
         ...prev,
@@ -148,7 +148,7 @@ const Categories = () => {
   const handleUpdateCategory = async (e) => {
     e.preventDefault();
     try {
-      const response = await api.put(`/categories/${editingCategoryData._id}`, {
+      const response = await api.put(`/admin/categories/${editingCategoryData._id}`, {
         name: editingCategoryData.name,
         displayName: editingCategoryData.displayName,
         description: editingCategoryData.description,
@@ -178,7 +178,7 @@ const Categories = () => {
     if (!window.confirm('Are you sure you want to delete this category?')) return;
     
     try {
-      await api.del(`/categories/${categoryId}`);
+      await api.del(`/admin/categories/${categoryId}`);
       toast.success('Category deleted successfully');
       loadCategories();
       loadStats();
@@ -189,7 +189,7 @@ const Categories = () => {
 
   const handleToggleFeatured = async (categoryId) => {
     try {
-      await api.patch(`/categories/${categoryId}/toggle-featured`);
+      await api.patch(`/admin/categories/${categoryId}/toggle-featured`);
       toast.success('Featured status updated');
       loadCategories();
     } catch (error) {
@@ -217,7 +217,7 @@ const Categories = () => {
     
     try {
       console.log('✅ Making API call to /categories/combined');
-      const response = await api.post('/categories/combined', combinedData);
+      const response = await api.post('/admin/categories/combined', combinedData);
       console.log('✅ API response:', response);
       toast.success('Combined category created successfully');
       setShowCombinedForm(false);
@@ -588,7 +588,7 @@ const Categories = () => {
                   combinedCategories: ['Beer', 'wine'],
                   imageUrl: ''
                 };
-                api.post('/categories/combined', testData)
+                api.post('/admin/categories/combined', testData)
                   .then(response => {
                     console.log('✅ Test API success:', response);
                     toast.success('Test category created');

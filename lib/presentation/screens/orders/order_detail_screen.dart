@@ -180,11 +180,11 @@ class OrderDetailScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.shopping_bag_outlined, color: Colors.black54, size: 20),
-              const SizedBox(width: 8),
-              const Text('Items Ordered', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Icon(Icons.shopping_bag_outlined, color: Colors.black54, size: 20),
+              SizedBox(width: 8),
+              Text('Items Ordered', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ],
           ),
           const SizedBox(height: 12),
@@ -250,11 +250,11 @@ class OrderDetailScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.receipt_outlined, color: Colors.black54, size: 20),
-              const SizedBox(width: 8),
-              const Text('Bill Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Icon(Icons.receipt_outlined, color: Colors.black54, size: 20),
+              SizedBox(width: 8),
+              Text('Bill Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ],
           ),
           const SizedBox(height: 12),
@@ -305,11 +305,11 @@ class OrderDetailScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.delivery_dining_outlined, color: Colors.black54, size: 20),
-              const SizedBox(width: 8),
-              const Text('Delivery Partner', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Icon(Icons.delivery_dining_outlined, color: Colors.black54, size: 20),
+              SizedBox(width: 8),
+              Text('Delivery Partner', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ],
           ),
           const SizedBox(height: 12),
@@ -365,11 +365,11 @@ class OrderDetailScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.location_on_outlined, color: Colors.black54, size: 20),
-              const SizedBox(width: 8),
-              const Text('Delivery Address', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Icon(Icons.location_on_outlined, color: Colors.black54, size: 20),
+              SizedBox(width: 8),
+              Text('Delivery Address', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ],
           ),
           const SizedBox(height: 12),

@@ -24,8 +24,8 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
   AnimationController? _cartAnimationController;
   bool _showCartIndicator = false;
   int _cartItemCount = 0;
-  Map<String, int> _itemQuantities = {};
-  Map<String, AnimationController> _itemAnimationControllers = {};
+  final Map<String, int> _itemQuantities = {};
+  final Map<String, AnimationController> _itemAnimationControllers = {};
 
   @override
   void initState() {
@@ -169,7 +169,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: Text('Add ${quantity} item${quantity > 1 ? 's' : ''} - ${item['price']!}'),
+                  child: Text('Add $quantity item${quantity > 1 ? 's' : ''} - ${item['price']!}'),
                 ),
               ),
             ],
@@ -841,7 +841,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                                         }
                                       });
                                     },
-                                    child: SizedBox(
+                                    child: const SizedBox(
                                       width: 32,
                                       height: 32,
                                       child: Center(
@@ -876,7 +876,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
                                         _cartItemCount++;
                                       });
                                     },
-                                    child: SizedBox(
+                                    child: const SizedBox(
                                       width: 32,
                                       height: 32,
                                       child: Center(
@@ -973,7 +973,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
           'image': 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd',
           'price': 'Rs ${199 + (index * 50)}',
           'description': 'Juicy beef patty with fresh vegetables',
-        } as Map<String, String>),
+        }),
       },
       {
         'name': 'Pizzas',
@@ -982,7 +982,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
           'image': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38',
           'price': 'Rs ${299 + (index * 50)}',
           'description': 'Classic Italian pizza with fresh toppings',
-        } as Map<String, String>),
+        }),
       },
       {
         'name': 'Desserts',
@@ -991,7 +991,7 @@ class _StoreDetailsScreenState extends State<StoreDetailsScreen> with TickerProv
           'image': 'https://images.unsplash.com/photo-1578985545062-69928b1d9587',
           'price': 'Rs ${149 + (index * 30)}',
           'description': 'Rich chocolate cake with cream',
-        } as Map<String, String>),
+        }),
       },
     ] as List<Map<String, dynamic>>;
 

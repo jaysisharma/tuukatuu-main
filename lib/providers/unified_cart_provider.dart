@@ -111,9 +111,6 @@ class UnifiedCartProvider extends ChangeNotifier {
 
   // Add item to cart
   void addItem(CartItem item) {
-    print('🛒 Adding item to cart: ${item.name} (ID: ${item.id}, Type: ${item.type})');
-    print('🛒 Item vendorId: ${item.vendorId}');
-    print('🛒 Current cart items count: ${_items.length}');
     
     final existingIndex = _items.indexWhere((existingItem) => 
       existingItem.id == item.id && existingItem.type == item.type
@@ -126,16 +123,15 @@ class UnifiedCartProvider extends ChangeNotifier {
         quantity: existingItem.quantity + item.quantity,
         notes: item.notes ?? existingItem.notes,
       );
-      print('🛒 Updated existing item quantity to: ${_items[existingIndex].quantity}');
+
     } else {
       // Add new item
       _items.add(item);
-      print('🛒 Added new item. Total items now: ${_items.length}');
+
     }
     
     _triggerAnimation();
     notifyListeners();
-    print('🛒 Cart updated. Total items: ${_items.length}');
   }
 
   // Add store item (convenience method)
@@ -151,18 +147,9 @@ class UnifiedCartProvider extends ChangeNotifier {
     Map<String, dynamic>? additionalData,
     Store? store,
   }) {
-    print('🛒 addStoreItem called with:');
-    print('  - id: $id');
-    print('  - name: $name');
-    print('  - price: $price');
-    print('  - quantity: $quantity');
-    print('  - vendorId: $vendorId');
-    print('  - store: ${store?.name}');
-    print('  - store.id: ${store?.id}');
     
     // Use store.id as fallback if vendorId is null
     final finalVendorId = vendorId ?? store?.id;
-    print('  - Final vendorId: $finalVendorId');
     
     addItem(CartItem(
       id: id,
@@ -252,9 +239,6 @@ class UnifiedCartProvider extends ChangeNotifier {
 
   // Clear items by vendor/store
   void clearItemsByVendor(String vendorId) {
-    print('🛒 Clearing items for vendor: $vendorId');
-    print('  - Items before clearing: ${_items.length}');
-    print('  - All items in cart:');
     for (final item in _items) {
       String? itemVendorId;
       if (item.vendorId is Map) {
@@ -262,7 +246,7 @@ class UnifiedCartProvider extends ChangeNotifier {
       } else {
         itemVendorId = item.vendorId?.toString();
       }
-      print('    * ${item.name}: vendorId=$itemVendorId, type=${item.type.name}');
+
     }
     
     _items.removeWhere((item) {
@@ -275,14 +259,13 @@ class UnifiedCartProvider extends ChangeNotifier {
       
       final shouldRemove = itemVendorId == vendorId;
       if (shouldRemove) {
-        print('    * Removing item: ${item.name} (vendorId: $itemVendorId)');
+  
       } else {
-        print('    * Keeping item: ${item.name} (vendorId: $itemVendorId != $vendorId)');
+  
       }
       return shouldRemove;
     });
     
-    print('  - Items after clearing: ${_items.length}');
     notifyListeners();
   }
 
@@ -302,37 +285,30 @@ class UnifiedCartProvider extends ChangeNotifier {
     final storeItems = getItemsByType(CartItemType.store);
     final grouped = <String, List<CartItem>>{};
     
-    print('🛒 getStoreItemsByVendor Debug:');
-    print('  - Store items count: ${storeItems.length}');
     
     for (final item in storeItems) {
-      print('  - Processing item: ${item.name}');
-      print('    * Item vendorId type: ${item.vendorId.runtimeType}');
-      print('    * Item vendorId value: ${item.vendorId}');
+
+
+
       
       String vendorId;
       if (item.vendorId is Map) {
         // If vendorId is a Map, extract the _id field
         vendorId = (item.vendorId as Map)['_id']?.toString() ?? 'unknown';
-        print('    * Extracted vendorId from Map: $vendorId');
+  
       } else {
         vendorId = item.vendorId?.toString() ?? 'unknown';
-        print('    * Using vendorId as string: $vendorId');
+  
       }
       
       if (!grouped.containsKey(vendorId)) {
         grouped[vendorId] = [];
-        print('    * Created new group for vendorId: $vendorId');
+  
       }
       grouped[vendorId]!.add(item);
-      print('    * Added item to group: $vendorId');
+
     }
-    
-    print('  - Final grouped items:');
-    for (final entry in grouped.entries) {
-      print('    * Vendor ${entry.key}: ${entry.value.length} items');
-    }
-    
+   
     return grouped;
   }
 

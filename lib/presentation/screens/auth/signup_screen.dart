@@ -1,5 +1,6 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../providers/auth_provider.dart';
@@ -7,8 +8,8 @@ import '../../../core/config/app_navigation.dart';
 import '../../../core/config/app_theme.dart';
 import '../../../services/error_service.dart';
 import '../../../services/api_service.dart';
-import 'login_screen.dart';
-
+import '../../../services/validation_service.dart';
+import '../../../utils/country_codes.dart';
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
@@ -30,7 +31,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isPhoneValid = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  String? _errorMessage;
+  CountryCode _selectedCountry = CountryCodes.defaultCountry;
+  final _searchController = TextEditingController();
+  List<CountryCode> _filteredCountries = CountryCodes.countries;
 
   @override
   void dispose() {
@@ -39,6 +42,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _phoneController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -63,8 +67,155 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   void _validatePhone(String phone) {
     setState(() {
-      _isPhoneValid = RegExp(r'^[0-9]{10}$').hasMatch(phone);
+      _isPhoneValid = ValidationService.isValidPhone(
+        _phoneController.text.trim(),
+        countryCode: _selectedCountry.code,
+      );
     });
+  }
+
+  void _showCountryCodePicker() {
+    // Reset search and filtered countries
+    _searchController.clear();
+    _filteredCountries = CountryCodes.countries;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildCountryCodePicker(),
+    );
+  }
+
+  Widget _buildCountryCodePicker() {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: AppTheme.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.white,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Text(
+                  'Select Country',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close, color: AppTheme.textTertiary),
+                ),
+              ],
+            ),
+          ),
+          
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (query) {
+                setState(() {
+                  if (query.isEmpty) {
+                    _filteredCountries = CountryCodes.countries;
+                  } else {
+                    _filteredCountries = CountryCodes.search(query);
+                  }
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Search country...',
+                prefixIcon: const Icon(Icons.search, color: AppTheme.textTertiary),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppTheme.borderColor),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppTheme.primaryOrange),
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Country List
+          Expanded(
+            child: ListView.builder(
+              itemCount: _filteredCountries.length,
+              itemBuilder: (context, index) {
+                final country = _filteredCountries[index];
+                final isSelected = country.code == _selectedCountry.code;
+                
+                return ListTile(
+                  leading: Text(
+                    country.flag,
+                    style: const TextStyle(fontSize: 24),
+                  ),
+                  title: Text(
+                    country.name,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  subtitle: Text(
+                    country.dialCode,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  trailing: isSelected
+                      ? const Icon(
+                          Icons.check_circle,
+                          color: AppTheme.primaryOrange,
+                          size: 24,
+                        )
+                      : null,
+                  onTap: () {
+                    setState(() {
+                      _selectedCountry = country;
+                    });
+                    Navigator.pop(context);
+                    // Re-validate phone number with new country code
+                    _validatePhone(_phoneController.text);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   bool _canProceed() {
@@ -82,11 +233,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Ensure phone number has correct country prefix
+      String phoneNumber = _phoneController.text.trim();
+      if (!phoneNumber.startsWith(_selectedCountry.dialCode)) {
+        phoneNumber = '${_selectedCountry.dialCode}$phoneNumber';
+      }
+      
       await authProvider.signup(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
-        phone: _phoneController.text.trim(),
+        phone: phoneNumber,
       );
 
       if (mounted) {
@@ -254,27 +412,92 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 const SizedBox(height: 20),
                 
                 // Phone Input Field
-                TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  onChanged: _validatePhone,
-                  decoration: AppTheme.inputDecoration(
-                    labelText: 'Phone Number',
-                    hintText: '10-digit mobile number',
-                    prefixIcon: const Icon(
-                      Icons.phone_outlined,
-                      color: AppTheme.textTertiary,
+                Row(
+                  children: [
+                    // Country Code Selector
+                    GestureDetector(
+                      onTap: () => _showCountryCodePicker(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        decoration: const BoxDecoration(
+                          color: AppTheme.lightGray,
+                          border: Border(
+                            top: BorderSide(color: AppTheme.borderColor),
+                            left: BorderSide(color: AppTheme.borderColor),
+                            bottom: BorderSide(color: AppTheme.borderColor),
+                          ),
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(12),
+                            bottomLeft: Radius.circular(12),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.phone_outlined,
+                              color: AppTheme.textTertiary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _selectedCountry.flag,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _selectedCountry.dialCode,
+                              style: const TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.arrow_drop_down,
+                              color: AppTheme.textTertiary,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your phone number';
-                    }
-                    if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) {
-                      return 'Please enter a valid 10-digit number';
-                    }
-                    return null;
-                  },
+                    Expanded(
+                      child: TextFormField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        onChanged: _validatePhone,
+                        decoration: AppTheme.inputDecoration(
+                          labelText: 'Phone Number',
+                          hintText: '',
+                        ).copyWith(
+                          prefixIcon: null, // Remove prefix icon since we have it in the container
+                          border: const OutlineInputBorder(
+                            borderRadius: BorderRadius.only(
+                              topRight: Radius.circular(12),
+                              bottomRight: Radius.circular(12),
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your phone number';
+                          }
+                          if (!ValidationService.isValidPhone(
+                            value.trim(),
+                            countryCode: _selectedCountry.code,
+                          )) {
+                            return ValidationService.getPhoneErrorMessage(
+                              value.trim(),
+                              countryCode: _selectedCountry.code,
+                            );
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 20),
                 

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'notification_service.dart';
@@ -16,7 +15,6 @@ class OrderPollingService {
     _isPolling = true;
     _pollingTimer = Timer.periodic(_pollingInterval, (_) => _checkOrderUpdates());
     
-    print('🔄 Order polling started');
   }
   
   // Stop polling

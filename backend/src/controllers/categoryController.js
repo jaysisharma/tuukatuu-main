@@ -1,5 +1,6 @@
 const CategoryService = require('../services/categoryService');
 const { validateCategoryData } = require('../utils/validation');
+const mongoose = require('mongoose');
 
 // Get all categories with pagination and filters
 exports.getAllCategories = async (req, res) => {
@@ -45,8 +46,8 @@ exports.getFeaturedCategories = async (req, res) => {
 // Get category by ID
 exports.getCategoryById = async (req, res) => {
   try {
-    const { categoryId } = req.params;
-    const result = await CategoryService.getCategoryById(categoryId);
+    const { id } = req.params;
+    const result = await CategoryService.getCategoryById(id);
     
     res.json(result);
   } catch (error) {
@@ -89,7 +90,7 @@ exports.createCategory = async (req, res) => {
 // Update category
 exports.updateCategory = async (req, res) => {
   try {
-    const { categoryId } = req.params;
+    const { id } = req.params;
     const updateData = req.body;
     const userId = req.user.id;
     
@@ -103,7 +104,7 @@ exports.updateCategory = async (req, res) => {
       });
     }
     
-    const result = await CategoryService.updateCategory(categoryId, updateData, userId);
+    const result = await CategoryService.updateCategory(id, updateData, userId);
     
     res.json(result);
   } catch (error) {
@@ -118,10 +119,10 @@ exports.updateCategory = async (req, res) => {
 // Delete category
 exports.deleteCategory = async (req, res) => {
   try {
-    const { categoryId } = req.params;
+    const { id } = req.params;
     const userId = req.user.id;
     
-    const result = await CategoryService.deleteCategory(categoryId, userId);
+    const result = await CategoryService.deleteCategory(id, userId);
     
     res.json(result);
   } catch (error) {
@@ -225,7 +226,7 @@ exports.uploadImage = async (req, res) => {
 // Upload category image
 exports.uploadCategoryImage = async (req, res) => {
   try {
-    const { categoryId } = req.params;
+    const { id } = req.params;
     const userId = req.user.id;
     
     if (!req.file) {
@@ -235,7 +236,7 @@ exports.uploadCategoryImage = async (req, res) => {
       });
     }
     
-    const result = await CategoryService.uploadCategoryImage(categoryId, req.file, userId);
+    const result = await CategoryService.uploadCategoryImage(id, req.file, userId);
     
     res.json(result);
   } catch (error) {
@@ -250,17 +251,38 @@ exports.uploadCategoryImage = async (req, res) => {
 // Toggle featured status
 exports.toggleFeatured = async (req, res) => {
   try {
-    const { categoryId } = req.params;
+    const { id } = req.params;
     const userId = req.user.id;
     
-    const result = await CategoryService.toggleFeatured(categoryId, userId);
+    console.log(`🔄 Toggle featured request for category: ${id}, user: ${userId}`);
     
+    // Validate categoryId
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      console.log(`❌ Invalid category ID: ${id}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid category ID'
+      });
+    }
+    
+    const result = await CategoryService.toggleFeatured(id, userId);
+    
+    console.log(`✅ Toggle featured successful for category: ${id}`);
     res.json(result);
   } catch (error) {
     console.error('❌ Error in toggleFeatured:', error);
-    res.status(400).json({
+    
+    // Handle specific error types
+    if (error.message === 'Category not found') {
+      return res.status(404).json({
+        success: false,
+        message: 'Category not found'
+      });
+    }
+    
+    res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Internal server error'
     });
   }
 };
@@ -268,7 +290,7 @@ exports.toggleFeatured = async (req, res) => {
 // Update sort order
 exports.updateSortOrder = async (req, res) => {
   try {
-    const { categoryId } = req.params;
+    const { id } = req.params;
     const { sortOrder } = req.body;
     const userId = req.user.id;
     
@@ -279,7 +301,7 @@ exports.updateSortOrder = async (req, res) => {
       });
     }
     
-    const result = await CategoryService.updateSortOrder(categoryId, sortOrder, userId);
+    const result = await CategoryService.updateSortOrder(id, sortOrder, userId);
     
     res.json(result);
   } catch (error) {

@@ -33,11 +33,17 @@ const DailyEssentials = () => {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/products?page=${currentPage}&limit=50&search=${searchTerm}`);
-      setProducts(response.data || []);
-      setTotalPages(response.pagination?.totalPages || 1);
+      console.log('Loading products from /admin/products...');
+      const response = await api.get(`/admin/products?page=${currentPage}&limit=50&search=${searchTerm}`);
+      console.log('Products response:', response);
+      setProducts(response.products || []);
+      setTotalPages(response.pagination?.totalPages || response.pagination?.pages || 1);
     } catch (error) {
+      console.error('Error loading products:', error);
       toast.error('Failed to load products');
+      // Set empty products array to prevent crashes
+      setProducts([]);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
@@ -45,10 +51,14 @@ const DailyEssentials = () => {
 
   const loadDailyEssentials = async () => {
     try {
+      console.log('Loading daily essentials from /daily-essentials...');
       const response = await api.get('/daily-essentials');
+      console.log('Daily essentials response:', response);
       setDailyEssentials(response.data || []);
     } catch (error) {
       console.error('Failed to load daily essentials:', error);
+      // Set empty array to prevent crashes
+      setDailyEssentials([]);
     }
   };
 
@@ -56,15 +66,11 @@ const DailyEssentials = () => {
     try {
       setUpdatingProduct(productId);
       
-      if (currentStatus) {
-        // Remove from daily essentials
-        await api.post('/daily-essentials/remove', { productId });
-        toast.success('Product removed from daily essentials');
-      } else {
-        // Add to daily essentials
-        await api.post('/daily-essentials/add', { productId });
-        toast.success('Product added to daily essentials');
-      }
+      // Use the toggle endpoint which handles both add and remove
+      await api.patch('/daily-essentials/admin/toggle', { productId });
+      
+      const message = currentStatus ? 'Product removed from daily essentials' : 'Product added to daily essentials';
+      toast.success(message);
       
       // Reload data
       loadProducts();
@@ -80,7 +86,7 @@ const DailyEssentials = () => {
     try {
       setUpdatingProduct(productId);
       
-      await api.post('/daily-essentials/toggle-featured', { productId });
+      await api.patch('/daily-essentials/admin/toggle-featured', { productId });
       toast.success(currentStatus ? 'Product unmarked as featured' : 'Product marked as featured');
       
       // Reload data
@@ -108,7 +114,7 @@ const DailyEssentials = () => {
 
   const ProductCard = ({ product }) => {
     const isEssential = isDailyEssential(product._id);
-    const isFeatured = product.dailyEssentialStatus?.isFeaturedDailyEssential || false;
+    const isFeatured = product.isFeaturedDailyEssential || false;
     const isUpdating = updatingProduct === product._id;
 
     return (

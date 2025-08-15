@@ -1,14 +1,28 @@
 const User = require('../models/User');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
+const { shuffleVendors } = require('../utils/shuffleUtils');
 
 // Get all vendors
 const getAllVendors = async (req, res) => {
   try {
-    const vendors = await User.find({ 
+    const { shuffle = 'true' } = req.query;
+    const shouldShuffle = shuffle === 'true' || shuffle === '1';
+    
+    let vendors = await User.find({ 
       role: 'vendor', 
       isActive: true 
     }).select('-password');
+    
+    // Apply smart shuffling for better user experience
+    if (shouldShuffle) {
+      vendors = shuffleVendors(vendors, {
+        prioritizeFeatured: true,
+        maintainQualityOrder: true,
+        considerRating: true
+      });
+    }
+    
     res.json(vendors);
   } catch (error) {
     console.error('Error getting all vendors:', error);
@@ -126,13 +140,14 @@ const getVendorCategories = async (req, res) => {
 // Get nearby vendors
 const getNearbyVendors = async (req, res) => {
   try {
-    const { latitude, longitude, radius = 10 } = req.query;
+    const { latitude, longitude, radius = 10, shuffle = 'true' } = req.query;
+    const shouldShuffle = shuffle === 'true' || shuffle === '1';
     
     if (!latitude || !longitude) {
       return res.status(400).json({ message: 'Latitude and longitude are required' });
     }
 
-    const vendors = await Vendor.find({
+    let vendors = await Vendor.find({
       isApproved: true,
       storeCoordinates: {
         $near: {
@@ -145,6 +160,15 @@ const getNearbyVendors = async (req, res) => {
       }
     }).select('-password');
 
+    // Apply smart shuffling for nearby vendors
+    if (shouldShuffle) {
+      vendors = shuffleVendors(vendors, {
+        prioritizeFeatured: true,
+        maintainQualityOrder: true,
+        considerRating: true
+      });
+    }
+
     res.json(vendors);
   } catch (error) {
     console.error('Error getting nearby vendors:', error);
@@ -156,10 +180,22 @@ const getNearbyVendors = async (req, res) => {
 const getVendorsByCategory = async (req, res) => {
   try {
     const { category } = req.params;
-    const vendors = await Vendor.find({
+    const { shuffle = 'true' } = req.query;
+    const shouldShuffle = shuffle === 'true' || shuffle === '1';
+    
+    let vendors = await Vendor.find({
       isApproved: true,
       categories: { $in: [category] }
     }).select('-password');
+    
+    // Apply smart shuffling for vendors by category
+    if (shouldShuffle) {
+      vendors = shuffleVendors(vendors, {
+        prioritizeFeatured: true,
+        maintainQualityOrder: true,
+        considerRating: true
+      });
+    }
     
     res.json(vendors);
   } catch (error) {
@@ -171,10 +207,22 @@ const getVendorsByCategory = async (req, res) => {
 // Get featured vendors
 const getFeaturedVendors = async (req, res) => {
   try {
-    const vendors = await Vendor.find({ 
+    const { shuffle = 'true' } = req.query;
+    const shouldShuffle = shuffle === 'true' || shuffle === '1';
+    
+    let vendors = await Vendor.find({ 
       isApproved: true, 
       isFeatured: true 
     }).select('-password');
+    
+    // Apply smart shuffling for featured vendors
+    if (shouldShuffle) {
+      vendors = shuffleVendors(vendors, {
+        prioritizeFeatured: true,
+        maintainQualityOrder: true,
+        considerRating: true
+      });
+    }
     
     res.json(vendors);
   } catch (error) {
@@ -186,7 +234,8 @@ const getFeaturedVendors = async (req, res) => {
 // Get vendors by type (restaurant/store)
 const getVendorsByType = async (req, res) => {
   try {
-    const { type, subType } = req.query;
+    const { type, subType, shuffle = 'true' } = req.query;
+    const shouldShuffle = shuffle === 'true' || shuffle === '1';
     const User = require('../models/User');
     
     let query = { 
@@ -202,9 +251,18 @@ const getVendorsByType = async (req, res) => {
       query.vendorSubType = subType;
     }
     
-    const vendors = await User.find(query)
+    let vendors = await User.find(query)
       .select('-password')
       .sort({ storeRating: -1, storeReviews: -1 });
+    
+    // Apply smart shuffling for vendors by type
+    if (shouldShuffle) {
+      vendors = shuffleVendors(vendors, {
+        prioritizeFeatured: true,
+        maintainQualityOrder: true,
+        considerRating: true
+      });
+    }
     
     console.log(`🔍 Found ${vendors.length} vendors for type: ${type}, subType: ${subType}`);
     
@@ -223,7 +281,20 @@ const getVendorsByType = async (req, res) => {
 // Get vendors for map display
 const getVendorsForMap = async (req, res) => {
   try {
-    const vendors = await Vendor.getVendorsForMap();
+    const { shuffle = 'true' } = req.query;
+    const shouldShuffle = shuffle === 'true' || shuffle === '1';
+    
+    let vendors = await Vendor.getVendorsForMap();
+    
+    // Apply smart shuffling for map vendors
+    if (shouldShuffle) {
+      vendors = shuffleVendors(vendors, {
+        prioritizeFeatured: true,
+        maintainQualityOrder: true,
+        considerRating: true
+      });
+    }
+    
     res.json(vendors);
   } catch (error) {
     console.error('Error getting vendors for map:', error);
@@ -234,7 +305,8 @@ const getVendorsForMap = async (req, res) => {
 // Get vendors within map bounds
 const getVendorsInBounds = async (req, res) => {
   try {
-    const { bounds } = req.query;
+    const { bounds, shuffle = 'true' } = req.query;
+    const shouldShuffle = shuffle === 'true' || shuffle === '1';
     
     if (!bounds) {
       return res.status(400).json({ message: 'Bounds parameter is required' });
@@ -247,7 +319,17 @@ const getVendorsInBounds = async (req, res) => {
       return res.status(400).json({ message: 'Invalid bounds format' });
     }
 
-    const vendors = await Vendor.getVendorsInBounds(boundsObj);
+    let vendors = await Vendor.getVendorsInBounds(boundsObj);
+    
+    // Apply smart shuffling for vendors in bounds
+    if (shouldShuffle) {
+      vendors = shuffleVendors(vendors, {
+        prioritizeFeatured: true,
+        maintainQualityOrder: true,
+        considerRating: true
+      });
+    }
+    
     res.json(vendors);
   } catch (error) {
     console.error('Error getting vendors in bounds:', error);

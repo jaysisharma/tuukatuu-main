@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'presentation/screens/home/home_screen.dart';
-import 'presentation/screens/t_mart_screen.dart';
 import 'presentation/screens/tmart_cart_screen.dart';
 import 'presentation/screens/tmart_search_screen.dart';
 import 'presentation/screens/tmart_category_products_screen.dart';
@@ -13,9 +11,7 @@ import 'presentation/screens/orders/orders_screen.dart';
 import 'presentation/screens/orders/order_tracking.dart';
 import 'presentation/screens/store_details_screen.dart';
 import 'presentation/screens/cart/cart_screen.dart';
-import 'presentation/screens/unified_cart_screen.dart';
 import 'presentation/screens/multi_store_cart_screen.dart';
-import 'presentation/screens/tmart_dedicated_cart_screen.dart';
 import 'presentation/screens/t_mart_clean_screen.dart';
 import 'presentation/screens/checkout_screen.dart';
 import 'presentation/screens/auth/login_screen.dart';
@@ -23,9 +19,8 @@ import 'presentation/screens/auth/signup_screen.dart';
 import 'presentation/screens/profile/profile_screen.dart';
 import 'presentation/screens/location/location_screen.dart';
 import 'presentation/screens/notifications/notification_screen.dart';
-import 'presentation/screens/notifications/notification_screen.dart';
-import 'screens/category_products_screen.dart';
-import 'presentation/screens/daily_essentials_page.dart';
+import 'presentation/screens/category_products_screen.dart';
+import 'presentation/screens/mart/daily_essentials_page.dart';
 import 'presentation/screens/recently_viewed_page.dart';
 import 'presentation/screens/main_screen.dart';
 
@@ -120,7 +115,7 @@ class AppRoutes {
       case orderTracking:
         if (settings.arguments != null) {
           final args = settings.arguments as Map<String, dynamic>;
-          final orderId = args['orderId'] as String;
+          // final orderId = args['orderId'] as String;
           final initialOrder = args['initialOrder'] as Map<String, dynamic>?;
           return MaterialPageRoute(
             // builder: (_) => OrderTrackingScreen(
@@ -144,7 +139,7 @@ class AppRoutes {
           final args = settings.arguments as Map<String, dynamic>;
           final category = args['category'] as String;
           return MaterialPageRoute(
-            builder: (_) => CategoryProductsScreen(category: category),
+                builder: (_) => CategoryProductsScreen(category: category),
           );
         }
         return MaterialPageRoute(
@@ -163,7 +158,7 @@ class AppRoutes {
       case location:
         return MaterialPageRoute(builder: (_) => const LocationScreen());
       case cart:
-        return MaterialPageRoute(builder: (_) => const TMartDedicatedCartScreen());
+        return MaterialPageRoute(builder: (_) => const CartScreen());
       case multiStoreCart:
         return MaterialPageRoute(builder: (_) => const MultiStoreCartScreen());
       case checkout:

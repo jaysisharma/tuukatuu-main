@@ -15,13 +15,13 @@ void main() {
 
   print('Original Error:');
   print(connectionRefusedError.toString());
-  print('\n' + '='*50 + '\n');
+  print('\n${'='*50}\n');
   
   print('Categorized Error Type: $errorType');
   print('User-Friendly Message: $userMessage');
   
   // Test other error types
-  print('\n' + '='*50 + '\n');
+  print('\n${'='*50}\n');
   print('Testing other error types:');
   
   final authError = Exception('Unauthorized: Invalid token');

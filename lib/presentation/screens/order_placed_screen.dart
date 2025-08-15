@@ -530,7 +530,7 @@ class _OrderPlacedScreenState extends State<OrderPlacedScreen>
                 Container(
                   width: 8,
                   height: 8,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: AppTheme.primaryOrange,
                     shape: BoxShape.circle,
                   ),

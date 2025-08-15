@@ -292,8 +292,8 @@ class _AddressesPageState extends State<AddressesPage> with SingleTickerProvider
                                   children: [
                                     CircleAvatar(
                                       backgroundColor: color.withOpacity(0.12),
-                                      child: Icon(icon, color: color, size: 22),
                                       radius: 18,
+                                      child: Icon(icon, color: color, size: 22),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(

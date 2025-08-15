@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously, deprecated_member_use
+
 import 'dart:convert';
 import 'dart:math';
 import 'dart:async';
@@ -27,7 +29,8 @@ class _MapPageState extends State<MapPage> {
   String? _error, _currentAddress;
   bool _isLoading = true;
   bool _isSaving = false;
-  bool _isMarkerDraggable = true;
+  // ignore: unused_field
+  final bool _isMarkerDraggable = true;
   BaatoCoordinate? _currentMarkerPosition;
   
   // TextEditingControllers for the save location modal
@@ -51,14 +54,13 @@ class _MapPageState extends State<MapPage> {
     Timer.periodic(const Duration(milliseconds: 500), (timer) {
       attempts++;
       if (_mapController != null && _currentMarkerPosition != null && mounted) {
-        print('✅ Map controller and position available, adding marker');
         _addMarkerAndAddress(
           _currentMarkerPosition!,
-          widget.place.name ?? "Selected Location",
+          widget.place.name,
         );
         timer.cancel();
       } else if (!mounted || attempts >= 10) { // Stop after 5 seconds (10 * 500ms)
-        print('⏰ Marker check timeout or widget disposed');
+        
         timer.cancel();
       }
     });
@@ -94,10 +96,6 @@ class _MapPageState extends State<MapPage> {
 
   Future<void> _fetchPlaceCoordinates() async {
     final placeId = widget.place.placeId;
-    if (placeId == null) {
-      _setError('Place ID missing. Please try selecting a different location.');
-      return;
-    }
 
     final url = 'https://api.baato.io/api/v1/places?key=$_baatoAccessToken&placeId=$placeId';
 
@@ -123,17 +121,15 @@ class _MapPageState extends State<MapPage> {
           
           _currentMarkerPosition = BaatoCoordinate(latitude: _latitude!, longitude: _longitude!);
           
-          print('📍 Coordinates fetched: ${_latitude}, ${_longitude}');
           
           // Only add marker if map controller is ready
           if (_mapController != null) {
-            print('🗺️ Map controller ready, adding marker');
             _addMarkerAndAddress(
               _currentMarkerPosition!,
-              widget.place.name ?? 'Selected Location',
+              widget.place.name,
             );
           } else {
-            print('⏳ Map controller not ready yet, will add marker when map is created');
+            
           }
           _clearLoading();
           return;
@@ -143,24 +139,23 @@ class _MapPageState extends State<MapPage> {
         _setError(data['message'] ?? 'Invalid response from location service.');
       }
     } catch (e) {
-      print('❌ Error fetching place coordinates: $e');
+      
       _setError('Network error. Please check your internet connection and try again.');
     }
   }
 
   void _onMapCreated(BaatoMapController controller) {
     _mapController = controller;
-    print('🗺️ Map controller created');
+    
     
     // Only add marker if we have coordinates
     if (_currentMarkerPosition != null) {
-      print('📍 Adding marker for existing position');
       _addMarkerAndAddress(
         _currentMarkerPosition!,
-        widget.place.name ?? "Selected Location",
+        widget.place.name,
       );
     } else {
-      print('⚠️ No marker position available when map was created');
+      
     }
     
     // Set up marker drag listener if available
@@ -168,15 +163,6 @@ class _MapPageState extends State<MapPage> {
   }
   
   // Method to check if we need to add a marker after map becomes ready
-  void _checkAndAddMarkerIfNeeded() {
-    if (_mapController != null && _currentMarkerPosition != null && mounted) {
-      print('🔍 Checking if marker needs to be added...');
-      _addMarkerAndAddress(
-        _currentMarkerPosition!,
-        widget.place.name ?? "Selected Location",
-      );
-    }
-  }
   
   void _setupMarkerDragListener() {
     // Note: Baato maps may not have direct marker drag listeners
@@ -186,27 +172,6 @@ class _MapPageState extends State<MapPage> {
   }
   
   // Method to update marker position when user taps on map
-  void _updateMarkerPosition(BaatoCoordinate newPosition) {
-    if (!mounted) return;
-    
-    print('📍 Updating marker position to: ${newPosition.latitude}, ${newPosition.longitude}');
-    
-    setState(() {
-      _latitude = newPosition.latitude;
-      _longitude = newPosition.longitude;
-      _currentMarkerPosition = newPosition;
-    });
-    
-    // Update address for new position
-    _fetchAddress(newPosition.latitude, newPosition.longitude);
-    
-    // Show feedback that this is now a custom location
-    if (_isCustomLocation()) {
-      _showSnackBar("📍 Custom location selected", isError: false);
-    } else {
-      _showSnackBar("📍 Location updated", isError: false);
-    }
-  }
 
   void _setError(String message) => setState(() {
         _error = message;
@@ -219,30 +184,30 @@ class _MapPageState extends State<MapPage> {
       });
 
   Future<void> _addMarkerAndAddress(BaatoCoordinate coord, String label) async {
-    print('🎯 Attempting to add marker: $label at ${coord.latitude}, ${coord.longitude}');
+    
     
     if (_mapController == null) {
-      print('❌ Map controller is null, cannot add marker');
+      
       return;
     }
     
     if (!mounted) {
-      print('❌ Widget not mounted, cannot add marker');
+      
       return;
     }
     
     // Retry mechanism for marker addition
     for (int attempt = 1; attempt <= 3; attempt++) {
       try {
-        print('🔄 Attempt $attempt: Adding marker...');
+        
         
         // Add a small delay to ensure map controller is fully ready
         await Future.delayed(Duration(milliseconds: 100 * attempt));
         
-        print('🗑️ Clearing existing markers...');
+        
         await _mapController!.markerManager.clearMarkers();
         
-        print('📍 Adding new marker...');
+        
         final markerOption = BaatoSymbolOption(
           geometry: coord,
           textField: label,
@@ -252,16 +217,16 @@ class _MapPageState extends State<MapPage> {
           textHaloColor: "#FFFFFF", // White halo around text
           textHaloWidth: 1.0, // Halo width
         );
-        print('🎯 Marker option created: ${markerOption.textField} at ${markerOption.geometry?.latitude}, ${markerOption.geometry?.longitude}');
+        
         
         await _mapController!.markerManager.addMarker(markerOption);
         
-        print('✅ Marker added successfully on attempt $attempt');
+        
         
         // Schedule map centering after a short delay
         Timer(const Duration(milliseconds: 500), () {
           if (mounted && _mapController != null) {
-            print('🎯 Scheduling map centering on marker');
+            
             // The map should already be centered since we set initialPosition
           }
         });
@@ -269,7 +234,7 @@ class _MapPageState extends State<MapPage> {
         await _fetchAddress(coord.latitude, coord.longitude);
         return; // Success, exit the retry loop
       } catch (e) {
-        print('❌ Error adding marker on attempt $attempt: $e');
+        
         if (attempt == 3) {
           // Final attempt failed
           if (mounted) {
@@ -284,49 +249,8 @@ class _MapPageState extends State<MapPage> {
   }
 
   // Method to handle marker drag events
-  void _onMarkerDragged(BaatoCoordinate newPosition) {
-    print('🎯 Marker dragged to: ${newPosition.latitude}, ${newPosition.longitude}');
-    
-    if (!mounted) return;
-    
-    setState(() {
-      _latitude = newPosition.latitude;
-      _longitude = newPosition.longitude;
-      _currentMarkerPosition = newPosition;
-    });
-    
-    // Fetch address for the new position
-    _fetchAddress(newPosition.latitude, newPosition.longitude);
-  }
   
   // Method to handle marker drag end
-  void _onMarkerDragEnd(BaatoCoordinate newPosition) {
-    print('🎯 Marker drag ended at: ${newPosition.latitude}, ${newPosition.longitude}');
-    
-    if (!mounted) return;
-    
-    setState(() {
-      _latitude = newPosition.latitude;
-      _longitude = newPosition.longitude;
-      _currentMarkerPosition = newPosition;
-    });
-    
-    try {
-      _fetchAddress(newPosition.latitude, newPosition.longitude);
-      
-      // Update address controller if modal is open
-      _updateAddressControllerIfNeeded();
-      
-      // Show feedback
-      if (_isCustomLocation()) {
-        _showSnackBar("📍 Custom location selected", isError: false);
-      } else {
-        _showSnackBar("📍 Location updated", isError: false);
-      }
-    } catch (e) {
-      print('❌ Error updating marker position: $e');
-    }
-  }
 
   void _updateAddressControllerIfNeeded() {
     // Update the address controller if it's currently being used and the address has changed
@@ -362,9 +286,9 @@ class _MapPageState extends State<MapPage> {
     
     // If no original coordinates, it might be a custom location created by tapping
     // Check if the current address doesn't match the original place name
-    if (_currentAddress != null && widget.place.name != null) {
-      return !_currentAddress!.contains(widget.place.name!) && 
-             !widget.place.name!.contains(_currentAddress!);
+    if (_currentAddress != null) {
+      return !_currentAddress!.contains(widget.place.name) && 
+             !widget.place.name.contains(_currentAddress!);
     }
     
     return false;
@@ -381,7 +305,7 @@ class _MapPageState extends State<MapPage> {
       if (response.statusCode != 200) {
         if (mounted) {
           setState(() {
-            _currentAddress = widget.place.name ?? 'Selected Location';
+            _currentAddress = widget.place.name;
           });
         }
         return;
@@ -417,10 +341,9 @@ class _MapPageState extends State<MapPage> {
       // Update the address controller if it's currently being used in a modal
       _updateAddressControllerIfNeeded();
     } catch (e) {
-      print('❌ Error fetching address: $e');
       if (mounted) {
         setState(() {
-          _currentAddress = widget.place.name ?? 'Selected Location';
+          _currentAddress = widget.place.name;
         });
       }
       
@@ -480,7 +403,7 @@ class _MapPageState extends State<MapPage> {
         _showSnackBar("❌ Failed to save location. Please try again.", isError: true);
       }
     } catch (e) {
-      print('❌ Error saving location: $e');
+      
       if (mounted) {
         _showSnackBar("❌ Error saving location. Please try again.", isError: true);
       }
@@ -679,7 +602,7 @@ class _MapPageState extends State<MapPage> {
         'deliveryLocation': true,
       });
     } catch (e) {
-      print('❌ Error setting delivery location: $e');
+      
       _showSnackBar("❌ Failed to set delivery location. Please try again.", isError: true);
     }
   }
@@ -703,7 +626,7 @@ class _MapPageState extends State<MapPage> {
 
     // Check if this is a custom location
     final isCustomLocation = _isCustomLocation();
-    print('📍 Save location - Is custom location: $isCustomLocation');
+    
 
     // Initialize controllers with current values
     _labelController.clear();
@@ -922,7 +845,7 @@ class _MapPageState extends State<MapPage> {
   // Method to reset to original location
   void _resetToOriginalLocation() {
     if (_originalLatitude != null && _originalLongitude != null) {
-      print('🔄 Resetting to original location: $_originalLatitude, $_originalLongitude');
+      
       
       setState(() {
         _latitude = _originalLatitude;
@@ -937,7 +860,7 @@ class _MapPageState extends State<MapPage> {
       if (_isMapReady) {
         _addMarkerAndAddress(
           _currentMarkerPosition!,
-          widget.place.name ?? "Selected Location",
+          widget.place.name,
         );
       }
       
@@ -947,7 +870,7 @@ class _MapPageState extends State<MapPage> {
 
   // Method to move marker to a new location
   void _moveMarkerToLocation(BaatoCoordinate newLocation) {
-    print('📍 Moving marker to: ${newLocation.latitude}, ${newLocation.longitude}');
+    
     
     if (!mounted) return;
     
@@ -976,10 +899,10 @@ class _MapPageState extends State<MapPage> {
   Widget build(BuildContext context) {
     // Debug information
     if (_currentMarkerPosition != null) {
-      print('🗺️ Map Debug - Current: ${_currentMarkerPosition!.latitude}, ${_currentMarkerPosition!.longitude}');
-      print('🗺️ Map Debug - Original: $_originalLatitude, $_originalLongitude');
-      print('🗺️ Map Debug - Is Custom: ${_isCustomLocation()}');
-      print('🗺️ Map Debug - Address: $_currentAddress');
+      
+      
+      
+      
     }
     
     if (_isLoading) {
@@ -1087,12 +1010,12 @@ class _MapPageState extends State<MapPage> {
             ),
             onMapCreated: _onMapCreated,
             onTap: (point, coord, feature) {
-              print('🎯 Map tapped at: ${coord.latitude}, ${coord.longitude}');
+              
               if (_isMapReady) {
                 // Move marker to the tapped location
                 _moveMarkerToLocation(coord);
               } else {
-                print('⚠️ Map not ready for marker movement');
+                
               }
             },
             logoViewMargins: const Point(-50, -50),
@@ -1130,14 +1053,14 @@ class _MapPageState extends State<MapPage> {
                 color: Colors.black.withOpacity(0.7),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.touch_app, color: Colors.white, size: 16),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   Text(
                     "Tap anywhere to move marker",
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,

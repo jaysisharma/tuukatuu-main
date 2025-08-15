@@ -42,5 +42,20 @@ export const api = {
     const json = await res.json();
     if (!res.ok) throw new Error(json.message || 'API error');
     return json;
+  },
+  uploadPut: async (url, formData) => {
+    const token = getToken();
+    const headers = {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+    const opts = {
+      method: 'PUT',
+      headers,
+      body: formData,
+    };
+    const res = await fetch(`${API_BASE}${url}`, opts);
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || 'API error');
+    return json;
   }
 }; 

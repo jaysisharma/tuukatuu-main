@@ -45,9 +45,15 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.category} Products'),
+        title: Text(widget.category,style: const TextStyle(fontSize: 16,fontWeight: FontWeight.w500,color: Colors.white),),
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white,),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

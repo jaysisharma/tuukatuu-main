@@ -24,10 +24,11 @@ class LocationProvider with ChangeNotifier {
       _deliveryLatitude = prefs.getDouble('delivery_latitude');
       _deliveryLongitude = prefs.getDouble('delivery_longitude');
       _deliveryLabel = prefs.getString('delivery_label');
+      
+    
       notifyListeners();
     } catch (e) {
-      print('❌ Error initializing location provider: $e');
-    }
+    } 
   }
 
   // Set delivery location
@@ -38,6 +39,8 @@ class LocationProvider with ChangeNotifier {
     String? label,
   }) async {
     _setLoading(true);
+    
+    print('📍 LocationProvider: Setting delivery location - Lat: $latitude, Lng: $longitude, Address: $address, Label: $label');
     
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -52,6 +55,8 @@ class LocationProvider with ChangeNotifier {
       _deliveryLatitude = latitude;
       _deliveryLongitude = longitude;
       _deliveryLabel = label;
+      
+      print('📍 LocationProvider: Successfully set delivery location - Lat: $_deliveryLatitude, Lng: $_deliveryLongitude');
       
       _clearLoading();
       notifyListeners();

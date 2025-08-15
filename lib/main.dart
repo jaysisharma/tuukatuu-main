@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tuukatuu/theme/app_theme.dart';
@@ -15,12 +13,15 @@ import 'package:tuukatuu/providers/recently_viewed_provider.dart';
 import 'package:tuukatuu/providers/search_provider.dart';
 import 'package:tuukatuu/providers/theme_provider.dart';
 import 'package:tuukatuu/providers/unified_cart_provider.dart';
+import 'package:tuukatuu/providers/enhanced_cart_provider.dart';
+import 'package:tuukatuu/providers/global_cart_provider.dart';
 import 'package:tuukatuu/providers/user_provider.dart';
+import 'package:tuukatuu/providers/favorites_provider.dart';
 import 'package:tuukatuu/routes.dart';
 import 'package:tuukatuu/services/notification_service.dart';
 import 'package:baato_maps/baato_maps.dart';
 
-const String baatoApiKey = 'bpk.c4NQriUA4yoDwdocKtxMB4dwZyoR7uA2jLAo43fTIa4z';
+const String baatoApiKey = 'bpk.60y09chwrI3haLoGMOxL_cXVEobHunegQcEWkRksr_cI';
 
 // Global route observer
 final RouteObserver<ModalRoute<void>> globalRouteObserver = RouteObserver<ModalRoute<void>>();
@@ -49,8 +50,10 @@ void main() async {
         ChangeNotifierProvider(create: (_) => LocationProvider()),
         ChangeNotifierProvider(create: (_) => MartCartProvider()),
         ChangeNotifierProvider(create: (_) => UnifiedCartProvider()),
+        ChangeNotifierProvider(create: (_) => EnhancedCartProvider()),
+        ChangeNotifierProvider(create: (_) => GlobalCartProvider()),
         ChangeNotifierProvider(create: (_) => RecentlyViewedProvider()),
-        // ChangeNotifierProvider(create: (_) => FavoritesProvider()),
+        ChangeNotifierProvider(create: (_) => FavoritesProvider()),
       ],
       child: MyApp(prefs: prefs),
     ),

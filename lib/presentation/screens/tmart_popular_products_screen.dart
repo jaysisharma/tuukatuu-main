@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:tuukatuu/providers/mart_cart_provider.dart';
 import 'package:tuukatuu/presentation/widgets/tmart_product_card.dart';
 import 'package:tuukatuu/services/api_service.dart';
-import 'package:tuukatuu/presentation/screens/tmart_cart_screen.dart';
 import 'package:tuukatuu/routes.dart';
 
 class TMartPopularProductsScreen extends StatefulWidget {
@@ -354,13 +353,7 @@ class _TMartPopularProductsScreenState extends State<TMartPopularProductsScreen>
             quantity: quantity,
             onAdd: () {
               martCartProvider.addItem(item);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${item['name']} added to cart'),
-                  backgroundColor: swiggyOrange,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              // Item added to cart silently
             },
             onIncrement: () {
               martCartProvider.updateQuantity(productId, quantity + 1);

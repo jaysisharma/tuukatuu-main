@@ -485,13 +485,7 @@ class _TMartSearchScreenState extends State<TMartSearchScreen> {
                   );
                   
                   cartProvider.addItem(cartItem);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${product['name']} added to cart'),
-                      backgroundColor: const Color(0xFFFC8019),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                  // Item added to cart silently
                 },
                 onIncrement: () {
                   cartProvider.updateQuantity(productId, CartItemType.tmart, quantity + 1);

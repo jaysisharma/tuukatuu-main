@@ -5,6 +5,7 @@ const Rider = require('../models/Rider');
 const bcrypt = require('bcryptjs');
 const { successResponse, errorResponse } = require('../utils/response');
 const logger = require('../utils/logger');
+const { shuffleVendors } = require('../utils/shuffleUtils');
 
 exports.getUsers = async (req, res) => {
   try {
@@ -71,7 +72,7 @@ exports.deleteUser = async (req, res) => {
 
 exports.createUser = async (req, res) => {
   try {
-    const { name, email, phone, password, role = 'customer', isActive = true, isFeatured = false, storeName, storeDescription, storeImage, storeBanner, storeTags, storeCategories, storeCoordinates, storeAddress } = req.body;
+    const { name, email, phone, password, role, isActive = true, isFeatured = false, storeName, storeDescription, storeImage, storeBanner, storeTags, storeCategories, storeAddress, vendorType, lat, long } = req.body;
     if (!name || !email || !phone || !password) {
       return res.status(400).json({ message: 'Name, email, phone, and password are required' });
     }
@@ -87,9 +88,15 @@ exports.createUser = async (req, res) => {
       userData.storeImage = storeImage;
       userData.storeBanner = storeBanner;
       userData.storeTags = Array.isArray(storeTags) ? storeTags : (typeof storeTags === 'string' ? storeTags.split(',').map(t => t.trim()).filter(Boolean) : []);
+      userData.vendorType = vendorType;
+      userData.lat = lat;
+      userData.long = long;
       userData.storeCategories = Array.isArray(storeCategories) ? storeCategories : (typeof storeCategories === 'string' ? storeCategories.split(',').map(t => t.trim()).filter(Boolean) : []);
       userData.isFeatured = isFeatured;
-      userData.storeCoordinates = storeCoordinates;
+      userData.storeCoordinates = {
+        type: 'Point',
+        coordinates: [long, lat]
+      };
       userData.storeAddress = storeAddress;
     }
     const user = new User(userData);
@@ -104,7 +111,8 @@ exports.createUser = async (req, res) => {
 
 exports.getVendors = async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, shuffle = 'true' } = req.query;
+    const shouldShuffle = shuffle === 'true' || shuffle === '1';
     const query = { role: 'vendor' };
     if (search) {
       query.$or = [
@@ -114,7 +122,17 @@ exports.getVendors = async (req, res) => {
         { storeName: { $regex: search, $options: 'i' } },
       ];
     }
-    const vendors = await User.find(query).select('-password');
+    let vendors = await User.find(query).select('-password');
+    
+    // Apply smart shuffling for admin vendor listing
+    if (shouldShuffle) {
+      vendors = shuffleVendors(vendors, {
+        prioritizeFeatured: true,
+        maintainQualityOrder: true,
+        considerRating: true
+      });
+    }
+    
     res.json(vendors);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -870,3 +888,4 @@ exports.getRiderPerformance = async (req, res) => {
     return res.status(500).json({ message: 'Failed to get rider performance' });
   }
 }; 
+

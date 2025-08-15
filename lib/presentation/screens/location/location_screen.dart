@@ -22,6 +22,8 @@ class _LocationScreenState extends State<LocationScreen> {
   String _currentLocationDisplay = "Detecting location...";
   String _locationDetails = "";
   bool _isLoadingLocation = false;
+  double _currentLatitude = 0.0;
+  double _currentLongitude = 0.0;
 
   @override
   void initState() {
@@ -96,6 +98,10 @@ class _LocationScreenState extends State<LocationScreen> {
           _locationDetails = locality;
           _isLoadingLocation = false;
         });
+        
+        // Store the actual coordinates for later use
+        _currentLatitude = position.latitude;
+        _currentLongitude = position.longitude;
       }
     } catch (e) {
       _setLocationError("Location unavailable", "Try again");
@@ -140,13 +146,13 @@ class _LocationScreenState extends State<LocationScreen> {
     final locationProvider = Provider.of<LocationProvider>(context, listen: false);
     await locationProvider.setDeliveryLocation(
       address: fullAddress,
-      latitude: 27.7172, // Default coordinates for current location
-      longitude: 85.3240,
+      latitude: _currentLatitude, // Use actual coordinates
+      longitude: _currentLongitude,
       label: 'Current Location',
     );
     
     if (mounted) {
-      _showSnackBar("✅ Delivery location set to current location");
+      _showSnackBar("Delivery location set to current location");
       Navigator.pop(context, {
         'label': 'Current Location',
         'address': fullAddress,
@@ -667,7 +673,7 @@ class _LocationScreenState extends State<LocationScreen> {
               children: [
                 BaatoPlaceAutoSuggestion(
                   hintText: 'Search places...',
-                  currentCoordinate: BaatoCoordinate(latitude: 27.7172, longitude: 85.3240),
+                  
                   onPlaceSelected: (suggestion) async {
                     final result = await Navigator.push(
                       context,

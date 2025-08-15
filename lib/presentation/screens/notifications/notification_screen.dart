@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:tuukatuu/services/notification_service.dart';
-import 'package:intl/intl.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});

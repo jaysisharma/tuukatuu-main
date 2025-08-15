@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:tuukatuu/presentation/screens/main_screen.dart';
-import '../../main.dart';
 import '../../presentation/screens/auth/signup_screen.dart';
 import '../../presentation/screens/auth/login_screen.dart';
 import '../../utils/double_back_exit.dart';

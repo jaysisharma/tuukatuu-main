@@ -1,8 +1,8 @@
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:tuukatuu/providers/mart_cart_provider.dart';
-import 'package:tuukatuu/services/api_service.dart';
 import 'package:tuukatuu/presentation/screens/checkout_screen.dart';
 
 class TMartCartScreen extends StatefulWidget {
@@ -18,7 +18,6 @@ class _TMartCartScreenState extends State<TMartCartScreen> {
   // Swiggy color scheme
   static const Color swiggyOrange = Color(0xFFFC8019);
   static const Color swiggyRed = Color(0xFFE23744);
-  static const Color swiggyDark = Color(0xFF1C1C1C);
   static const Color swiggyLight = Color(0xFFF8F9FA);
 
   @override
@@ -26,7 +25,7 @@ class _TMartCartScreenState extends State<TMartCartScreen> {
     final martCartProvider = Provider.of<MartCartProvider>(context);
     final items = martCartProvider.items;
     final total = martCartProvider.totalAmount;
-    print("Items $items");
+   
     return Scaffold(
       backgroundColor: swiggyLight,
       appBar: AppBar(
@@ -63,12 +62,7 @@ class _TMartCartScreenState extends State<TMartCartScreen> {
             TextButton(
               onPressed: () {
                 martCartProvider.forceClearCart();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Cart force cleared for debugging'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
+                // Cart force cleared for debugging silently
               },
               child: Text(
                 'Debug Clear',
@@ -575,16 +569,7 @@ class _TMartCartScreenState extends State<TMartCartScreen> {
       
     } catch (e) {
       print('❌ Error during checkout: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Error during checkout. Please try again.',
-            style: GoogleFonts.poppins(),
-          ),
-          backgroundColor: swiggyRed,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      // Error during checkout - handle silently
     } finally {
       setState(() {
         _isCheckingOut = false;

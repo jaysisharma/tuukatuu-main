@@ -321,13 +321,13 @@ class OrderProvider extends ChangeNotifier {
       case OrderStatus.cancelled:
         // Get cancellation reason from order
         final order = getOrderById(orderId);
-        final reason = order?.statusHistory?.last?['note'] ?? 'No reason provided';
+        final reason = order?.statusHistory?.last['note'] ?? 'No reason provided';
         await NotificationService.showOrderCancelled(orderId, reason);
         break;
       case OrderStatus.failed:
         // Get failure reason from order
         final order = getOrderById(orderId);
-        final reason = order?.statusHistory?.last?['note'] ?? 'No reason provided';
+        final reason = order?.statusHistory?.last['note'] ?? 'No reason provided';
         await NotificationService.showOrderRejected(orderId, reason);
         break;
       default:

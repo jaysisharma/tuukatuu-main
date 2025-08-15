@@ -1,128 +1,176 @@
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:tuukatuu/providers/location_provider.dart';
 
-class LocationService {
-  static Future<bool> requestLocationPermission() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+/// Global Location Service
+/// Provides easy access to the selected delivery location throughout the app
+class GlobalLocationService {
+  static GlobalLocationService? _instance;
+  static GlobalLocationService get instance => _instance ??= GlobalLocationService._();
 
-    // Test if location services are enabled.
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      // Location services are not enabled
+  GlobalLocationService._();
+
+  /// Get the current delivery location from the LocationProvider
+  /// Returns null if no location is set
+  static Map<String, dynamic>? getCurrentLocation(BuildContext context) {
+    try {
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      return locationProvider.getDeliveryLocationMap();
+    } catch (e) {
+      print('❌ Error getting current location: $e');
+      return null;
+    }
+  }
+
+  /// Get the current delivery address
+  static String? getCurrentAddress(BuildContext context) {
+    try {
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      return locationProvider.deliveryAddress;
+    } catch (e) {
+      print('❌ Error getting current address: $e');
+      return null;
+    }
+  }
+
+  /// Get the current delivery latitude
+  static double? getCurrentLatitude(BuildContext context) {
+    try {
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      final latitude = locationProvider.deliveryLatitude;
+      print('📍 GlobalLocationService: Retrieved latitude: $latitude');
+      return latitude;
+    } catch (e) {
+      print('❌ Error getting current latitude: $e');
+      return null;
+    }
+  }
+
+  /// Get the current delivery longitude
+  static double? getCurrentLongitude(BuildContext context) {
+    try {
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      final longitude = locationProvider.deliveryLongitude;
+      print('📍 GlobalLocationService: Retrieved longitude: $longitude');
+      return longitude;
+    } catch (e) {
+      print('❌ Error getting current longitude: $e');
+      return null;
+    }
+  }
+
+  /// Get the current delivery location label
+  static String? getCurrentLocationLabel(BuildContext context) {
+    try {
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      return locationProvider.deliveryLabel;
+    } catch (e) {
+      print('❌ Error getting current location label: $e');
+      return null;
+    }
+  }
+
+  /// Check if a delivery location is set
+  static bool hasDeliveryLocation(BuildContext context) {
+    try {
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      return locationProvider.hasDeliveryLocation;
+    } catch (e) {
+      print('❌ Error checking delivery location: $e');
       return false;
     }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        // Permissions are denied
-        return false;
-      }
-    }
-    
-    if (permission == LocationPermission.deniedForever) {
-      // Permissions are denied forever
-      return false;
-    }
-
-    // Permissions are granted
-    return true;
   }
 
-  static Future<Position?> getCurrentLocation() async {
+  /// Get the current location as a formatted string
+  static String getFormattedLocation(BuildContext context) {
     try {
-      final hasPermission = await requestLocationPermission();
-      if (!hasPermission) return null;
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      
+      if (!locationProvider.hasDeliveryLocation) {
+        return 'No delivery location set';
+      }
 
-      return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
-      );
+      final label = locationProvider.deliveryLabel;
+      final address = locationProvider.deliveryAddress;
+      
+      if (label != null && label.isNotEmpty) {
+        return '$label: $address';
+      }
+      
+      return address ?? 'Unknown location';
     } catch (e) {
-      print('Error getting current location: $e');
-      return null;
+      print('❌ Error getting formatted location: $e');
+      return 'Location unavailable';
     }
   }
 
-  static Future<String> getAddressFromCoordinates(Position position) async {
+  /// Get location coordinates as a string
+  static String getCoordinatesString(BuildContext context) {
     try {
-      final placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-
-      if (placemarks.isNotEmpty) {
-        final place = placemarks[0];
-        final addressParts = <String>[
-          if (place.subLocality?.isNotEmpty ?? false) place.subLocality!,
-          if (place.locality?.isNotEmpty ?? false) place.locality!,
-          if (place.administrativeArea?.isNotEmpty ?? false) place.administrativeArea!,
-        ];
-        
-        return addressParts.isNotEmpty ? addressParts.join(', ') : 'Location found';
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      
+      if (!locationProvider.hasDeliveryLocation) {
+        return 'No coordinates available';
       }
-      return 'Location found';
+
+      final lat = locationProvider.deliveryLatitude;
+      final lng = locationProvider.deliveryLongitude;
+      
+      if (lat != null && lng != null) {
+        return '${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}';
+      }
+      
+      return 'Coordinates unavailable';
     } catch (e) {
-      return 'Location found';
+      print('❌ Error getting coordinates string: $e');
+      return 'Coordinates unavailable';
     }
   }
 
-  static String calculateDistanceText(Position? userLocation, Map<String, dynamic>? storeCoordinates) {
-    if (userLocation == null || storeCoordinates == null) {
-      return 'Distance unavailable';
-    }
-    
+  /// Listen to location changes
+  static void listenToLocationChanges(BuildContext context, VoidCallback callback) {
     try {
-      final storeLat = storeCoordinates['latitude'];
-      final storeLng = storeCoordinates['longitude'];
-      
-      if (storeLat == null || storeLng == null) {
-        return 'Distance unavailable';
-      }
-      
-      final distance = Geolocator.distanceBetween(
-        userLocation.latitude,
-        userLocation.longitude,
-        storeLat.toDouble(),
-        storeLng.toDouble(),
-      );
-      
-      if (distance < 1000) {
-        return '${distance.round()}m away';
-      } else {
-        return '${(distance / 1000).toStringAsFixed(1)}km away';
-      }
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      locationProvider.addListener(callback);
     } catch (e) {
-      print('Error calculating distance: $e');
-      return 'Distance unavailable';
+      print('❌ Error listening to location changes: $e');
     }
   }
 
-  static double? calculateDistance(Position? userLocation, Map<String, dynamic>? storeCoordinates) {
-    if (userLocation == null || storeCoordinates == null) {
-      return null;
-    }
-    
+  /// Remove location change listener
+  static void removeLocationListener(BuildContext context, VoidCallback callback) {
     try {
-      final storeLat = storeCoordinates['latitude'];
-      final storeLng = storeCoordinates['longitude'];
-      
-      if (storeLat == null || storeLng == null) {
-        return null;
-      }
-      
-      return Geolocator.distanceBetween(
-        userLocation.latitude,
-        userLocation.longitude,
-        storeLat.toDouble(),
-        storeLng.toDouble(),
-      );
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      locationProvider.removeListener(callback);
     } catch (e) {
-      print('Error calculating distance: $e');
-      return null;
+      print('❌ Error removing location listener: $e');
     }
   }
+}
+
+/// Extension methods for easy access to location data
+extension LocationExtension on BuildContext {
+  /// Get current delivery location
+  Map<String, dynamic>? get currentLocation => GlobalLocationService.getCurrentLocation(this);
+  
+  /// Get current delivery address
+  String? get currentAddress => GlobalLocationService.getCurrentAddress(this);
+  
+  /// Get current delivery latitude
+  double? get currentLatitude => GlobalLocationService.getCurrentLatitude(this);
+  
+  /// Get current delivery longitude
+  double? get currentLongitude => GlobalLocationService.getCurrentLongitude(this);
+  
+  /// Get current delivery location label
+  String? get currentLocationLabel => GlobalLocationService.getCurrentLocationLabel(this);
+  
+  /// Check if delivery location is set
+  bool get hasDeliveryLocation => GlobalLocationService.hasDeliveryLocation(this);
+  
+  /// Get formatted location string
+  String get formattedLocation => GlobalLocationService.getFormattedLocation(this);
+  
+  /// Get coordinates string
+  String get coordinatesString => GlobalLocationService.getCoordinatesString(this);
 } 

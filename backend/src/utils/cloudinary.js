@@ -1,5 +1,6 @@
 const cloudinary = require('cloudinary').v2;
 const fs = require('fs');
+const path = require('path');
 
 // Configure Cloudinary
 cloudinary.config({
@@ -15,7 +16,17 @@ exports.uploadToCloudinary = async (file, folder = 'general') => {
       throw new Error('No file provided');
     }
 
-    const result = await cloudinary.uploader.upload(file.path, {
+    // Support both multer file object and direct file path string
+    let filePath = typeof file === 'string' ? file : file.path;
+    if (!filePath && file && file.destination && file.filename) {
+      filePath = path.join(file.destination, file.filename);
+    }
+
+    if (!filePath) {
+      throw new Error('Missing file path');
+    }
+
+    const result = await cloudinary.uploader.upload(filePath, {
       folder: folder,
       resource_type: 'auto',
       transformation: [
@@ -25,7 +36,9 @@ exports.uploadToCloudinary = async (file, folder = 'general') => {
     });
 
     // Delete local file after upload
-    fs.unlinkSync(file.path);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
 
     return {
       secure_url: result.secure_url,
@@ -36,9 +49,12 @@ exports.uploadToCloudinary = async (file, folder = 'general') => {
     };
   } catch (error) {
     // Clean up local file if it exists
-    if (file && file.path && fs.existsSync(file.path)) {
-      fs.unlinkSync(file.path);
-    }
+    try {
+      const filePath = typeof file === 'string' ? file : file?.path;
+      if (filePath && fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (_) {}
     throw error;
   }
 };

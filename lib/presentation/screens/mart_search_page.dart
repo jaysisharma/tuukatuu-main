@@ -6,6 +6,8 @@ import '../../widgets/cached_image.dart';
 import 'product_details_screen.dart';
 
 class MartSearchPage extends StatefulWidget {
+  const MartSearchPage({super.key});
+
   @override
   State<MartSearchPage> createState() => _MartSearchPageState();
 }

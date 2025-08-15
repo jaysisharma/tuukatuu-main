@@ -25,9 +25,9 @@ class StoreService {
     }
   }
 
-  static Future<List<Store>> getFeaturedStores() async {
+  static Future<List<Store>> getFeaturedStores(double lat, double lon) async {
     try {
-      final data = await ApiService.get('/vendors?featured=true');
+      final data = await ApiService.get('/customer/featured-stores?lat=$lat&lon=$lon');
       final stores = (data['vendors'] as List)
           .map((json) => Store.fromJson(json))
           .toList();

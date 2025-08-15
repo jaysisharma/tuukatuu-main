@@ -1,4 +1,4 @@
-const TMartBanner = require('../models/TMartBanner');
+const Banner = require('../models/Banner');
 const TMartCategory = require('../models/TMartCategory');
 const TMartDeal = require('../models/TMartDeal');
 const Order = require('../models/Order');
@@ -8,11 +8,15 @@ const Product = require('../models/Product');
 // Get T-Mart banners
 exports.getBanners = async (req, res) => {
   try {
-    const banners = await TMartBanner.find({ 
+    const banners = await Banner.find({ 
+      bannerType: 'tmart',
       isActive: true,
       startDate: { $lte: new Date() },
-      endDate: { $gte: new Date() }
-    }).sort({ sortOrder: 1, createdAt: -1 });
+      $or: [
+        { endDate: null },
+        { endDate: { $gt: new Date() } }
+      ]
+    }).sort({ sortOrder: 1, priority: 1, createdAt: -1 });
     
     res.json({
       success: true,

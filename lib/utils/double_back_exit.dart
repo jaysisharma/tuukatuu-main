@@ -15,11 +15,11 @@ class DoubleBackExit {
       // Show snackbar to inform user about double tap to exit
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Row(
+          content: const Row(
             children: [
-              const Icon(Icons.info_outline, color: Colors.white),
-              const SizedBox(width: 8),
-              const Text('Press back again to exit'),
+              Icon(Icons.info_outline, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Press back again to exit'),
             ],
           ),
           duration: const Duration(seconds: 2),

@@ -3,16 +3,17 @@ const router = express.Router();
 const tmartController = require('../controllers/tmartController');
 const { authenticateToken } = require('../middleware/auth');
 
-// Banners and Categories
-router.get('/banners', tmartController.getBanners);
-router.get('/categories', tmartController.getCategories);
+router.get('/search', tmartController.searchProducts);
 router.get('/categories/featured', tmartController.getFeaturedCategories);
-router.get('/daily-essentials', tmartController.getDailyEssentials);
+router.get('/banners', tmartController.getBanners);
+// Daily essentials moved to dedicated /daily-essentials route
+// router.get('/daily-essentials', tmartController.getDailyEssentials);
+// Banners and Categories
+router.get('/categories', tmartController.getCategories);
 
 // Products
 router.get('/products/:productId', tmartController.getProductDetails);
 router.get('/category/query', tmartController.getProductsByCategory);
-router.get('/search', tmartController.searchProducts);
 router.get('/best-sellers', tmartController.getBestSellers);
 router.get('/popular', tmartController.getPopularProducts);
 router.get('/featured-popular', tmartController.getFeaturedPopularProducts);

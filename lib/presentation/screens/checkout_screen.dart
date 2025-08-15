@@ -8,7 +8,6 @@ import 'order_placed_screen.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/cached_image.dart';
 import '../../services/api_service.dart';
-import '../../services/error_service.dart';
 import '../screens/location/location_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -34,7 +33,6 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   int _selectedAddressIndex = 0;
   int _selectedPaymentMethodIndex = 0;
-  int _selectedDeliveryTimeIndex = 0;
   int _selectedTipIndex = 0; // Default to 20
   final TextEditingController _instructionsController = TextEditingController();
   final TextEditingController _customTipController = TextEditingController();
@@ -134,12 +132,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     },
   ];
 
-  final List<String> _deliveryTimes = [
-    'As soon as possible',
-    'In 30 minutes',
-    'In 1 hour',
-    'In 2 hours',
-  ];
 
   final List<int> _tipOptions = [20, 50, 100];
 
@@ -325,7 +317,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ],
                             const SizedBox(height: 16),
                             // Select Different Location Button
-                            Container(
+                            SizedBox(
                               width: double.infinity,
                               child: OutlinedButton.icon(
                                 onPressed: () async {
@@ -610,13 +602,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             if (widget.cartItems.isNotEmpty) {
                               final firstItem = widget.cartItems.first;
                               vendorId = firstItem['vendorId']?.toString();
-                              print("Vendor ID from cart items: $vendorId");
                             }
                             
                             // Fallback to hardcoded vendorId if not found in cart items
                             if (vendorId == null || vendorId.isEmpty) {
                               vendorId = isTmartOrder ? 'tmart' : 'vendor_id';
-                              print("Fallback Vendor ID: $vendorId");
                             }
                             final items = widget.cartItems.map((item) => {
                               'product': item['id'],
@@ -626,7 +616,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             final addOnsTotal = _getAddOnsTotal();
                             final itemTotal = widget.totalAmount;
                             final tax = itemTotal * 0.05; // Changed from 0.13 to 0.05 to match the summary display
-                            final deliveryFee = 40.0;
+                            
                             final total = itemTotal + tax + deliveryFee + tip + addOnsTotal;
                             
                             // Check if address has valid coordinates
@@ -648,11 +638,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             }
                             
                             // Validate vendorId is not null or empty
-                            if (vendorId == null || vendorId.isEmpty) {
+                            if (vendorId.isEmpty) {
                               return;
                             }
-                            print("Order Payload - Vendor ID: $vendorId");
-                            print("Order Payload - Items: $items");
                             final orderPayload = {
                               'vendorId': vendorId,
                               'items': items,
@@ -887,161 +875,7 @@ print("Place Order Pressed");
     );
   }
 
-  Widget _buildDeliveryTimeSection() {
-    return Container(
-      height: 40,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: Theme.of(context).cardColor,
-      ),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: _deliveryTimes.length,
-        itemBuilder: (context, index) {
-          final isSelected = index == _selectedDeliveryTimeIndex;
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: ChoiceChip(
-              label: Text(_deliveryTimes[index]),
-              selected: isSelected,
-              onSelected: (selected) {
-                if (selected) {
-                  setState(() => _selectedDeliveryTimeIndex = index);
-                }
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
 
-  Widget _buildTipSection() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Text(
-              'Add Tip for Rider',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.volunteer_activism,
-              color: theme.colorScheme.primary,
-              size: 20,
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Show your appreciation for the rider\'s service',
-          style: TextStyle(
-            color: isDark ? Colors.grey[400] : Colors.grey[600],
-            fontSize: 14,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            ..._tipOptions.asMap().entries.map((entry) {
-              final index = entry.key;
-              final amount = entry.value;
-              final isSelected = !_isCustomTip && index == _selectedTipIndex;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _isCustomTip = false;
-                      _selectedTipIndex = index;
-                    });
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isSelected
-                            ? Theme.of(context).colorScheme.primary
-                            : (Theme.of(context).brightness == Brightness.dark ? Colors.grey[800]! : Colors.grey[300]!),
-                      ),
-                    ),
-                    child: Text(
-                      'Rs $amount',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _isCustomTip = true;
-                  });
-                },
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _isCustomTip ? Theme.of(context).colorScheme.primary : Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: _isCustomTip
-                          ? Theme.of(context).colorScheme.primary
-                          : (Theme.of(context).brightness == Brightness.dark ? Colors.grey[800]! : Colors.grey[300]!),
-                    ),
-                  ),
-                  child: _isCustomTip
-                      ? TextField(
-                          controller: _customTipController,
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          decoration: const InputDecoration(
-                            hintText: 'Custom',
-                            border: InputBorder.none,
-                            hintStyle: TextStyle(
-                              color: Colors.white70,
-                            ),
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                          onChanged: (value) {
-                            setState(() {});
-                          },
-                        )
-                      : Text(
-                          'Custom',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: _isCustomTip ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
 
   Widget _buildOrderSummary(double itemTotal, double tax, double deliveryFee, double tip, double total) {
     return Container(

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tuukatuu/models/product.dart';
-import '../../../state/providers/search_provider.dart';
 import '../widgets/filter_bottom_sheet.dart';
 import '../widgets/cached_image.dart';
 import 'search_results_screen.dart';
@@ -256,21 +255,7 @@ class _SearchScreenState extends State<SearchScreen> {
       store: store,
     );
     
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${product.name} added to cart'),
-        backgroundColor: swiggyOrange,
-        behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(
-          label: 'View Cart',
-          textColor: Colors.white,
-          onPressed: () {
-            Navigator.pushNamed(context, '/multi-store-cart');
-          },
-        ),
-      ),
-    );
+    // Item added to cart silently
   }
 
   void _navigateToResults(String query) async {
@@ -347,7 +332,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     color: Colors.grey[600],
                     fontSize: 16,
                   ),
-                  prefixIcon: Icon(
+                  prefixIcon: const Icon(
                     Icons.search_rounded,
                     color: swiggyOrange,
                   ),
@@ -412,7 +397,7 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
               TextButton(
                 onPressed: _clearRecentSearches,
-                child: Text(
+                child: const Text(
                   'Clear All',
                   style: TextStyle(
                     color: swiggyOrange,
@@ -521,7 +506,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       const SizedBox(height: 4),
                       Text(
                         'Rs ${product.price.toStringAsFixed(2)}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: swiggyOrange,
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
@@ -676,7 +661,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
                 TextButton(
                   onPressed: () => _navigateToResults(_searchController.text),
-                  child: Text(
+                  child: const Text(
                     'View All',
                     style: TextStyle(
                       color: swiggyOrange,
@@ -722,7 +707,7 @@ class _SearchScreenState extends State<SearchScreen> {
           const SizedBox(height: 4),
           Text(
             'Rs ${product.price.toStringAsFixed(2)}',
-            style: TextStyle(
+            style: const TextStyle(
               color: swiggyOrange,
               fontWeight: FontWeight.w600,
             ),

@@ -3,15 +3,15 @@ const router = express.Router();
 const dailyEssentialController = require('../controllers/dailyEssentialController');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
-// Public routes (for mobile app)
+// Public routes (no auth required)
 router.get('/', dailyEssentialController.getDailyEssentials);
 
-// Admin routes (require authentication and admin role)
-router.use(authenticateToken, requireAdmin);
-
-// Daily essential management
-router.post('/add', dailyEssentialController.addDailyEssential);
-router.post('/remove', dailyEssentialController.removeDailyEssential);
-router.post('/toggle-featured', dailyEssentialController.toggleFeaturedDailyEssential);
+// Admin routes (require admin authentication)
+router.post('/admin/add', authenticateToken, requireAdmin, dailyEssentialController.addDailyEssential);
+router.delete('/admin/remove', authenticateToken, requireAdmin, dailyEssentialController.removeDailyEssential);
+router.patch('/admin/toggle', authenticateToken, requireAdmin, dailyEssentialController.toggleDailyEssential);
+router.patch('/admin/toggle-featured', authenticateToken, requireAdmin, dailyEssentialController.toggleFeaturedDailyEssential);
+router.get('/admin/products', authenticateToken, requireAdmin, dailyEssentialController.getAllProductsWithDailyEssentialStatus);
+router.get('/admin/all', authenticateToken, requireAdmin, dailyEssentialController.getDailyEssentials);
 
 module.exports = router; 

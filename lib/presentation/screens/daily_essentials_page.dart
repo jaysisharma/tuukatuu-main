@@ -123,18 +123,18 @@ class _DailyEssentialsPageState extends State<DailyEssentialsPage> {
                       color: Colors.orange,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.star,
                           color: Colors.white,
                           size: 12,
                         ),
-                        const SizedBox(width: 4),
+                        SizedBox(width: 4),
                         Text(
                           'FEATURED',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -242,7 +242,7 @@ class _DailyEssentialsPageState extends State<DailyEssentialsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Daily Essentials',
+          'Daily Essentiassls',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.black87,
@@ -281,7 +281,7 @@ class _DailyEssentialsPageState extends State<DailyEssentialsPage> {
                 ),
                 const SizedBox(height: 12),
                 // Category Filter
-                Container(
+                SizedBox(
                   height: 40,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
@@ -297,7 +297,7 @@ class _DailyEssentialsPageState extends State<DailyEssentialsPage> {
                           });
                         },
                         child: Container(
-                          margin: EdgeInsets.only(right: 8),
+                          margin: const EdgeInsets.only(right: 8),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           decoration: BoxDecoration(
                             color: isSelected ? Colors.orange : Colors.grey[200],

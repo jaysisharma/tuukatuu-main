@@ -16,8 +16,7 @@ class TMartProductDetailScreen extends StatefulWidget {
 
 class _TMartProductDetailScreenState extends State<TMartProductDetailScreen> {
   int _quantity = 1;
-  int _cartQuantity = 0;
-  bool _isLoading = false;
+  final bool _isLoading = false;
   List<Map<String, dynamic>> _similarProducts = [];
   bool _loadingSimilar = false;
 
@@ -33,10 +32,8 @@ class _TMartProductDetailScreenState extends State<TMartProductDetailScreen> {
   }
 
   void _updateCartQuantity() {
-    final martCartProvider = Provider.of<MartCartProvider>(context, listen: false);
-    final productId = widget.product['_id'] ?? widget.product['id'] ?? '';
+    Provider.of<MartCartProvider>(context, listen: false);
     setState(() {
-      _cartQuantity = martCartProvider.getItemQuantity(productId);
     });
   }
 
@@ -74,23 +71,7 @@ class _TMartProductDetailScreenState extends State<TMartProductDetailScreen> {
     martCartProvider.addItem(widget.product, quantity: _quantity);
     _updateCartQuantity();
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${widget.product['name']} added to cart'),
-        backgroundColor: swiggyOrange,
-        behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(
-          label: 'View Cart',
-          textColor: Colors.white,
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const TMartCartScreen()),
-            );
-          },
-        ),
-      ),
-    );
+    // Item added to cart silently
   }
 
   void _incrementQuantity() {
@@ -107,13 +88,132 @@ class _TMartProductDetailScreenState extends State<TMartProductDetailScreen> {
     }
   }
 
+  // Helper method to extract numeric price from string
+  double _extractNumericPrice(String? priceString) {
+    if (priceString == null || priceString.isEmpty) return 0.0;
+    
+    print('Extracting price from: "$priceString"');
+    
+    // Handle different price formats
+    String cleanPrice = priceString;
+    
+    // Remove currency symbols, text, and extra spaces
+    cleanPrice = cleanPrice
+        .replaceAll(RegExp(r'Rs\.?\s*'), '') // Remove "Rs." or "Rs" with optional space
+        .replaceAll(RegExp(r'₹\s*'), '')      // Remove "₹" with optional space
+        .replaceAll(RegExp(r'\$\s*'), '')     // Remove "$" with optional space
+        .replaceAll(RegExp(r'[^\d.]'), '')    // Remove all non-digit, non-dot characters
+        .trim();                               // Remove leading/trailing spaces
+    
+    print('Cleaned price string: "$cleanPrice"');
+    
+    // Handle cases where there might be multiple decimal points
+    final parts = cleanPrice.split('.');
+    if (parts.length > 2) {
+      cleanPrice = '${parts[0]}.${parts.sublist(1).join('')}';
+      print('Fixed multiple decimals: "$cleanPrice"');
+    }
+    
+    // Ensure we have a valid number
+    if (cleanPrice.isEmpty || cleanPrice == '.') {
+      print('Invalid price string after cleaning');
+      return 0.0;
+    }
+    
+    try {
+      final price = double.parse(cleanPrice);
+      print('Successfully parsed price: $price');
+      return price.isFinite ? price : 0.0;
+    } catch (e) {
+      print('Error parsing price: "$priceString" -> cleaned: "$cleanPrice" -> error: $e');
+      return 0.0;
+    }
+  }
+
+  // Alternative method to get price - try to get the original numeric value first
+  double _getProductPrice() {
+    // Try different possible price field names
+    final possiblePriceFields = ['price', 'Price', 'PRICE', 'amount', 'Amount', 'AMOUNT'];
+    
+    for (final fieldName in possiblePriceFields) {
+      final priceValue = widget.product[fieldName];
+      if (priceValue != null) {
+        print('Found price in field "$fieldName": $priceValue (${priceValue.runtimeType})');
+        
+        // If it's already a number, use it directly
+        if (priceValue is num) {
+          print('Price is already numeric: $priceValue');
+          return priceValue.toDouble();
+        }
+        
+        // If it's a string, try to extract the numeric value
+        if (priceValue is String) {
+          final extractedPrice = _extractNumericPrice(priceValue);
+          if (extractedPrice > 0) {
+            print('Successfully extracted price from string: $extractedPrice');
+            return extractedPrice;
+          }
+        }
+      }
+    }
+    
+    // Fallback to 0
+    print('No valid price found in any field');
+    return 0.0;
+  }
+
+  // Method to get original price for discount calculations
+  double _getOriginalPrice() {
+    // Try different possible original price field names
+    final possibleOriginalPriceFields = ['originalPrice', 'original_price', 'OriginalPrice', 'ORIGINAL_PRICE'];
+    
+    for (final fieldName in possibleOriginalPriceFields) {
+      final originalPriceValue = widget.product[fieldName];
+      if (originalPriceValue != null) {
+        print('Found original price in field "$fieldName": $originalPriceValue (${originalPriceValue.runtimeType})');
+        
+        // If it's already a number, use it directly
+        if (originalPriceValue is num) {
+          print('Original price is already numeric: $originalPriceValue');
+          return originalPriceValue.toDouble();
+        }
+        
+        // If it's a string, try to extract the numeric value
+        if (originalPriceValue is String) {
+          final extractedPrice = _extractNumericPrice(originalPriceValue);
+          if (extractedPrice > 0) {
+            print('Successfully extracted original price from string: $extractedPrice');
+            return extractedPrice;
+          }
+        }
+      }
+    }
+    
+    // If no original price found, return 0
+    print('No original price found, using 0');
+    return 0.0;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final martCartProvider = Provider.of<MartCartProvider>(context);
-    final hasDiscount = widget.product['originalPrice'] != null && 
-                       widget.product['originalPrice'] > widget.product['price'];
+    Provider.of<MartCartProvider>(context);
+    
+    // Debug logging
+    print('Product data: ${widget.product}');
+    print('Price: ${widget.product['price']} (type: ${widget.product['price']?.runtimeType})');
+    print('Original Price: ${widget.product['originalPrice']} (type: ${widget.product['originalPrice']?.runtimeType})');
+    print('All product keys: ${widget.product.keys.toList()}');
+    
+    // Extract numeric prices for comparison
+    final currentPrice = _getProductPrice();
+    final originalPrice = _getOriginalPrice();
+    
+    print('Extracted current price: $currentPrice');
+    print('Extracted original price: $originalPrice');
+    
+    final hasDiscount = originalPrice > 0 && originalPrice > currentPrice;
     final discountPercentage = hasDiscount 
-        ? (((widget.product['originalPrice'] - widget.product['price']) / widget.product['originalPrice']) * 100).round()
+        ? (((originalPrice - currentPrice) / originalPrice) * 100).round()
         : 0;
 
     return Scaffold(
@@ -153,9 +253,9 @@ class _TMartProductDetailScreenState extends State<TMartProductDetailScreen> {
             Container(
               height: 300,
               width: double.infinity,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius: const BorderRadius.only(
+                borderRadius: BorderRadius.only(
                   bottomLeft: Radius.circular(20),
                   bottomRight: Radius.circular(20),
                 ),
@@ -196,7 +296,7 @@ class _TMartProductDetailScreenState extends State<TMartProductDetailScreen> {
                   Row(
                     children: [
                       Text(
-                        '₹${widget.product['price']?.toString() ?? '0'}',
+                        '₹${currentPrice.toStringAsFixed(2)}',
                         style: GoogleFonts.poppins(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -206,7 +306,7 @@ class _TMartProductDetailScreenState extends State<TMartProductDetailScreen> {
                       if (hasDiscount) ...[
                         const SizedBox(width: 12),
                         Text(
-                          '₹${widget.product['originalPrice']}',
+                          '₹${originalPrice.toStringAsFixed(2)}',
                           style: GoogleFonts.poppins(
                             fontSize: 18,
                             color: Colors.grey[500],
@@ -324,7 +424,7 @@ class _TMartProductDetailScreenState extends State<TMartProductDetailScreen> {
                       child: _isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
                           : Text(
-                              'Add to Cart - ₹${(widget.product['price'] * _quantity).toString()}',
+                              'Add to Cart - ₹${(currentPrice * _quantity).toStringAsFixed(2)}',
                               style: GoogleFonts.poppins(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -351,7 +451,7 @@ class _TMartProductDetailScreenState extends State<TMartProductDetailScreen> {
                             ),
                           ),
                           if (_loadingSimilar)
-                            SizedBox(
+                            const SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
@@ -474,13 +574,7 @@ class _TMartProductDetailScreenState extends State<TMartProductDetailScreen> {
                                                 onTap: () {
                                                   final martCartProvider = Provider.of<MartCartProvider>(context, listen: false);
                                                   martCartProvider.addItem(product, quantity: 1);
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text('${product['name']} added to cart'),
-                                                      backgroundColor: swiggyOrange,
-                                                      behavior: SnackBarBehavior.floating,
-                                                    ),
-                                                  );
+                                                  // Item added to cart silently
                                                 },
                                                 child: Container(
                                                   width: 32,
@@ -541,7 +635,7 @@ class _TMartProductDetailScreenState extends State<TMartProductDetailScreen> {
                                                         borderRadius: BorderRadius.circular(8),
                                                       ),
                                                       child: Text(
-                                                        '${cartQuantity} in cart',
+                                                        '$cartQuantity in cart',
                                                         style: GoogleFonts.poppins(
                                                           fontSize: 10,
                                                           color: swiggyOrange,

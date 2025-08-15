@@ -3,12 +3,12 @@ import 'package:provider/provider.dart';
 import '../../models/product.dart';
 import '../../models/store.dart';
 import '../../providers/search_provider.dart';
-import '../../providers/unified_cart_provider.dart';
+import '../../providers/enhanced_cart_provider.dart';
+import '../../models/cart_item.dart';
 import '../widgets/cached_image.dart';
-import '../widgets/filter_bottom_sheet.dart';
+import '../../widgets/global_cart_fab.dart';
 import '../../services/api_service.dart';
 import 'dart:async';
-import '../../../core/config/routes.dart';
 import 'product_details_screen.dart';
 
 class SearchResultsScreen extends StatefulWidget {
@@ -40,7 +40,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
 
   // Swiggy color scheme
   static const Color swiggyOrange = Color(0xFFFC8019);
-  static const Color swiggyLight = Color(0xFFF8F9FA);
 
   @override
   void initState() {
@@ -72,18 +71,14 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
   }
 
   void _syncQuantitiesWithCart() {
-    final cartProvider = Provider.of<UnifiedCartProvider>(context, listen: false);
+    final cartProvider = Provider.of<EnhancedCartProvider>(context, listen: false);
     
     for (var product in _filteredProducts) {
-      final quantity = cartProvider.getItemQuantity(product.id, CartItemType.store);
+      final quantity = cartProvider.getItemQuantity(product, CartItemSource.store);
       _quantities[product.id] = quantity;
     }
   }
 
-  Future<void> _refreshSimilarAndRecommended() async {
-    print('🔄 Search Results: Refreshing similar and recommended products');
-    await _loadSimilarAndRecommendedProducts();
-  }
 
   void _navigateToProductDetails(Product product) {
     Navigator.push(
@@ -259,133 +254,48 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
     });
   }
 
-  void _showFilterBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        maxChildSize: 0.9,
-        minChildSize: 0.5,
-        builder: (context, scrollController) => const FilterBottomSheet(),
-      ),
-    ).then((value) {
-      if (value == true) {
-        _applyFilters();
-      }
-    });
-  }
 
-  void _applyFilters() {
-    final searchProvider = Provider.of<SearchProvider>(context, listen: false);
-    setState(() {
-      _filteredProducts = Product.dummyProducts.where((product) {
-        if (searchProvider.onlyAvailable && !product.isAvailable) return false;
-        if (searchProvider.freeDelivery && product.deliveryFee > 0) return false;
-        if (searchProvider.selectedCategories.isNotEmpty &&
-            !searchProvider.selectedCategories.contains(product.category)) {
-          return false;
-        }
-        if (product.price < searchProvider.minPrice ||
-            product.price > searchProvider.maxPrice) {
-          return false;
-        }
-        return true;
-      }).toList();
-
-      // Apply sorting
-      switch (searchProvider.sortBy) {
-        case 'Rating':
-          _filteredProducts.sort((a, b) => b.rating.compareTo(a.rating));
-          break;
-        case 'Delivery Time':
-          _filteredProducts.sort((a, b) =>
-              (a.deliveryTime ?? '').compareTo(b.deliveryTime ?? ''));
-          break;
-        case 'Popular':
-        default:
-          _filteredProducts.sort((a, b) => b.reviews.compareTo(a.reviews));
-          break;
-      }
-    });
-  }
 
   void _updateQuantity(String productId, bool increment, Product product) {
-    final cartProvider = Provider.of<UnifiedCartProvider>(context, listen: false);
+    final cartProvider = Provider.of<EnhancedCartProvider>(context, listen: false);
     
     setState(() {
       if (increment) {
         _quantities[productId] = (_quantities[productId] ?? 0) + 1;
         
-        // Add to unified cart as store item
-        cartProvider.addStoreItem(
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          quantity: 1,
-          image: product.imageUrl,
-          vendorId: product.vendorId,
-          vendorName: product.vendorName,
-          store: Store(
-            id: product.vendorId,
-            name: product.vendorName, // Use proper vendor name instead of category
-            description: product.vendorDescription,
-            image: product.vendorImage,
-            banner: product.vendorImage,
-            address: product.vendor?['storeAddress'] ?? 'Store Address',
-            phone: product.vendor?['phone'] ?? 'Store Phone',
-            email: product.vendor?['email'] ?? 'store@example.com',
-            rating: (product.vendor?['storeRating'] ?? product.rating).toDouble(),
-            reviews: product.vendor?['storeReviews'] ?? product.reviews,
-            isFeatured: product.vendor?['isFeatured'] ?? true,
-            isActive: true,
-            deliveryTime: '30-45 min',
-            minimumOrder: 0.0,
-            deliveryFee: product.deliveryFee,
-            categories: product.vendor?['storeCategories']?.cast<String>() ?? [product.category],
-          ),
+        // Add to enhanced cart as store item
+        final store = Store(
+          id: product.vendorId,
+          name: product.vendorName, // Use proper vendor name instead of category
+          description: product.vendorDescription,
+          image: product.vendorImage,
+          banner: product.vendorImage,
+          address: product.vendor?['storeAddress'] ?? 'Store Address',
+          phone: product.vendor?['phone'] ?? 'Store Phone',
+          email: product.vendor?['email'] ?? 'store@example.com',
+          rating: (product.vendor?['storeRating'] ?? product.rating).toDouble(),
+          reviews: product.vendor?['storeReviews'] ?? product.reviews,
+          isFeatured: product.vendor?['isFeatured'] ?? true,
+          isActive: true,
+          deliveryTime: '30-45 min',
+          minimumOrder: 0.0,
+          deliveryFee: product.deliveryFee,
+          categories: product.vendor?['storeCategories']?.cast<String>() ?? [product.category],
         );
+        cartProvider.addFromStore(product, store);
         
         _cartAnimationController.forward().then((_) {
           _cartAnimationController.reverse();
         });
         
         // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${product.name} added to cart'),
-            backgroundColor: swiggyOrange,
-            behavior: SnackBarBehavior.floating,
-            action: SnackBarAction(
-              label: 'View Cart',
-              textColor: Colors.white,
-              onPressed: () {
-                Navigator.pushNamed(context, '/multi-store-cart');
-              },
-            ),
-          ),
-        );
+        // Item added to cart silently
       } else {
         if ((_quantities[productId] ?? 0) > 0) {
           _quantities[productId] = _quantities[productId]! - 1;
           
-          // Update quantity in unified cart
-          final existingItem = cartProvider.items.firstWhere(
-            (item) => item.id == product.id && item.type == CartItemType.store,
-            orElse: () => CartItem(
-              id: '',
-              name: '',
-              price: 0,
-              quantity: 0,
-              image: '',
-              type: CartItemType.store,
-            ),
-          );
-          
-          if (existingItem.id.isNotEmpty) {
-            cartProvider.updateQuantity(product.id, CartItemType.store, _quantities[productId]!);
-          }
+          // Update quantity in enhanced cart
+          cartProvider.updateQuantity(product, CartItemSource.store, _quantities[productId]!);
         }
       }
     });
@@ -581,7 +491,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
                   const SizedBox(height: 8),
                   Text(
                     'Rs ${product.price}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: swiggyOrange,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -600,8 +510,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final searchProvider = Provider.of<SearchProvider>(context);
-    final cartProvider = Provider.of<UnifiedCartProvider>(context);
+    Provider.of<SearchProvider>(context);
+    Provider.of<EnhancedCartProvider>(context);
 
     // Sync quantities when cart changes
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -612,43 +522,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
       backgroundColor: isDark ? Colors.grey[900] : Colors.grey[100],
       floatingActionButton: ScaleTransition(
         scale: _cartAnimation,
-        child: FloatingActionButton(
-          onPressed: () {
-            Navigator.pushNamed(context, '/multi-store-cart');
-          },
-          backgroundColor: swiggyOrange,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              const Icon(Icons.shopping_cart, color: Colors.white),
-              if (cartProvider.itemCount > 0)
-                Positioned(
-                  right: -8,
-                  top: -8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 20,
-                      minHeight: 20,
-                    ),
-                    child: Text(
-                      '${cartProvider.itemCount}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+        child: const GlobalCartFAB(
+          heroTag: 'search_results_fab',
         ),
       ),
       body: SafeArea(
@@ -689,10 +564,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
                       ),
                       child: TextField(
                         controller: _searchController,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           hintText: 'Search...',
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
+                          contentPadding: EdgeInsets.symmetric(
                             horizontal: 16,
                           ),
                         ),

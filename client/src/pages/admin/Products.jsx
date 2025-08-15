@@ -25,9 +25,9 @@ export default function Products() {
     setLoading(true);
     setError('');
     try {
-      const { products, total } = await api.get(`/products?search=${encodeURIComponent(opts.search ?? search)}&vendorId=${encodeURIComponent(opts.vendorId ?? vendorFilter)}&page=${opts.page ?? page}&limit=${pageSize}`);
-      setProducts(products);
-      setTotal(total);
+      const response = await api.get(`/admin/products?search=${encodeURIComponent(opts.search ?? search)}&vendorId=${encodeURIComponent(opts.vendorId ?? vendorFilter)}&page=${opts.page ?? page}&limit=${pageSize}`);
+      setProducts(response.products);
+      setTotal(response.total);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -37,8 +37,8 @@ export default function Products() {
 
   const fetchVendors = async () => {
     try {
-      const data = await api.get('/admin/vendors');
-      setVendors(data);
+      const response = await api.get('/admin/vendors');
+      setVendors(response.data || response);
     } catch {}
   };
 
@@ -147,7 +147,7 @@ function DeleteProductConfirm({ product, onClose }) {
   const handleDelete = async () => {
     setLoading(true);
     try {
-      await api.del(`/products/${product._id}`);
+      await api.del(`/admin/products/${product._id}`);
       onClose();
     } catch (err) {
       alert(err.message);

@@ -1,30 +1,49 @@
 const express = require('express');
 const router = express.Router();
-const { authenticateToken: auth } = require('../middleware/auth');
-const adminController = require('../controllers/adminController');
+const categoryController = require('../controllers/categoryController');
+const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const upload = require('../middleware/upload');
 
-// Get all categories
-router.get('/', auth, (req, res) => res.json({ message: 'Categories endpoint - to be implemented' }));
+// Apply admin middleware to all routes
+router.use(authenticateToken, requireAdmin);
+
+// Get all categories with pagination and filters
+router.get('/', categoryController.getAllCategories);
+
+// Get category statistics
+router.get('/stats', categoryController.getCategoryStats);
 
 // Get category by ID
-router.get('/:id', auth, (req, res) => res.json({ message: 'Category details - to be implemented' }));
+router.get('/:id', categoryController.getCategoryById);
 
-// Create category
-router.post('/', auth, (req, res) => res.json({ message: 'Create category - to be implemented' }));
+// Create new category
+router.post('/', categoryController.createCategory);
 
 // Update category
-router.put('/:id', auth, (req, res) => res.json({ message: 'Update category - to be implemented' }));
+router.put('/:id', categoryController.updateCategory);
 
 // Delete category
-router.delete('/:id', auth, (req, res) => res.json({ message: 'Delete category - to be implemented' }));
+router.delete('/:id', categoryController.deleteCategory);
 
-// Toggle category status
-router.patch('/:id/toggle', auth, (req, res) => res.json({ message: 'Toggle category - to be implemented' }));
+// Toggle category featured status
+router.patch('/:id/toggle-featured', categoryController.toggleFeatured);
 
-// Get category products
-router.get('/:id/products', auth, (req, res) => res.json({ message: 'Category products - to be implemented' }));
+// Update category sort order
+router.patch('/:id/sort-order', categoryController.updateSortOrder);
 
-// Get category analytics
-router.get('/:id/analytics', auth, (req, res) => res.json({ message: 'Category analytics - to be implemented' }));
+// Create combined category
+router.post('/combined', categoryController.createCombinedCategory);
+
+// Bulk update categories
+router.post('/bulk-update', categoryController.bulkUpdateCategories);
+
+// Upload category image
+router.post('/upload-image', upload.single('image'), categoryController.uploadImage);
+
+// Upload image for specific category
+router.post('/:id/upload-image', upload.single('image'), categoryController.uploadCategoryImage);
+
+// Auto-create category from product
+router.post('/auto-create', categoryController.autoCreateFromProduct);
 
 module.exports = router; 

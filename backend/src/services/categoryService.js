@@ -1,6 +1,7 @@
 const Category = require('../models/Category');
 const Product = require('../models/Product');
 const { uploadToCloudinary } = require('../utils/cloudinary');
+const mongoose = require('mongoose');
 
 class CategoryService {
   // Get all categories with pagination and filters
@@ -322,15 +323,30 @@ class CategoryService {
   // Toggle featured status
   static async toggleFeatured(categoryId, userId) {
     try {
+      console.log(`🔄 CategoryService: Toggling featured for category: ${categoryId}`);
+      
+      // Validate ObjectId
+      if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+        throw new Error('Invalid category ID format');
+      }
+      
       const category = await Category.findById(categoryId);
       
       if (!category) {
+        console.log(`❌ Category not found: ${categoryId}`);
         throw new Error('Category not found');
       }
       
+      console.log(`📊 Current featured status: ${category.isFeatured}`);
+      
+      // Toggle the featured status
       category.isFeatured = !category.isFeatured;
       category.updatedBy = userId;
+      
+      // Save the updated category
       await category.save();
+      
+      console.log(`✅ Featured status updated to: ${category.isFeatured}`);
       
       return {
         success: true,
@@ -338,6 +354,7 @@ class CategoryService {
         message: `Category ${category.isFeatured ? 'marked as' : 'removed from'} featured`
       };
     } catch (error) {
+      console.error(`❌ Error in CategoryService.toggleFeatured:`, error);
       throw error;
     }
   }

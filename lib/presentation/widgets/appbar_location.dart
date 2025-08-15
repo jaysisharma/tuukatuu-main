@@ -47,14 +47,7 @@ class AppBarLocation extends StatelessWidget implements PreferredSizeWidget {
               // Handle result if needed
               if (result != null && result is Map<String, dynamic>) {
                 // Location was selected or saved
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Delivery location updated'),
-                    behavior: SnackBarBehavior.floating,
-                    margin: const EdgeInsets.all(16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                );
+                // Delivery location updated silently
               }
             },
             child: Column(

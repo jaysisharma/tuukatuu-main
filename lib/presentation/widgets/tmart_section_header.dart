@@ -21,11 +21,7 @@ class TMartSectionHeader extends StatelessWidget {
         Row(
           children: [
             if (icon != null) ...[
-              Icon(
-                icon,
-                color: const Color(0xFFFC8019), // Swiggy Orange
-                size: 20,
-              ),
+             
               const SizedBox(width: 8),
             ],
             Text(

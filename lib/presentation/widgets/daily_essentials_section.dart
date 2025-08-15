@@ -73,7 +73,8 @@ class _DailyEssentialsSectionState extends State<DailyEssentialsSection> {
 
     return Container(
       width: 140,
-      margin: EdgeInsets.only(right: 12),
+      height: 200,
+      margin: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -120,18 +121,18 @@ class _DailyEssentialsSectionState extends State<DailyEssentialsSection> {
                       color: Colors.orange,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.star,
                           color: Colors.white,
                           size: 10,
                         ),
-                        const SizedBox(width: 2),
+                        SizedBox(width: 2),
                         Text(
                           'FEATURED',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 8,
                             fontWeight: FontWeight.bold,
@@ -378,7 +379,7 @@ class _DailyEssentialsSectionState extends State<DailyEssentialsSection> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Container(
+      return const SizedBox(
         height: 200,
         child: Center(
           child: CircularProgressIndicator(),
@@ -387,7 +388,7 @@ class _DailyEssentialsSectionState extends State<DailyEssentialsSection> {
     }
 
     if (_hasError || _dailyEssentials.isEmpty) {
-      return SizedBox.shrink(); // Hide section if no data
+      return const SizedBox.shrink(); // Hide section if no data
     }
 
     return Column(
@@ -422,9 +423,9 @@ class _DailyEssentialsSectionState extends State<DailyEssentialsSection> {
                     color: Colors.orange,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
+                  child: const Text(
                     'View All',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -435,11 +436,11 @@ class _DailyEssentialsSectionState extends State<DailyEssentialsSection> {
             ],
           ),
         ),
-        Container(
+        SizedBox(
           height: 200,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
             itemCount: _dailyEssentials.length,
             itemBuilder: (context, index) {
               final product = _dailyEssentials[index];

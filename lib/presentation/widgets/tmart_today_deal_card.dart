@@ -132,7 +132,7 @@ class _TMartTodayDealCardState extends State<TMartTodayDealCard> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '${discountPercentage}% OFF',
+                      '$discountPercentage% OFF',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,
@@ -252,7 +252,7 @@ class _TMartTodayDealCardState extends State<TMartTodayDealCard> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.access_time,
                           size: 12,
                           color: swiggyRed,
@@ -287,7 +287,7 @@ class _TMartTodayDealCardState extends State<TMartTodayDealCard> {
                             ),
                           ),
                           Text(
-                            '${soldQuantity}/${maxQuantity} sold',
+                            '$soldQuantity/$maxQuantity sold',
                             style: GoogleFonts.poppins(
                               fontSize: 10,
                               color: Colors.grey[500],

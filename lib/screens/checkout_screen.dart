@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../providers/address_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/unified_cart_provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../widgets/cached_image.dart';
 import '../services/api_service.dart';
 
@@ -50,35 +49,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'details': 'Pay with eSewa',
       'icon': null,
       'logo': 'https://esewa.com.np/common/images/esewa_logo.png',
-      'color': Color(0xFF60BB46),
+      'color': const Color(0xFF60BB46),
     },
     {
       'type': 'Khalti',
       'details': 'Pay with Khalti',
       'icon': null,
       'logo': 'https://khalti.com/static/images/khalti-logo.png',
-      'color': Color(0xFF5C2D91),
+      'color': const Color(0xFF5C2D91),
     },
     {
       'type': 'FonePay',
       'details': 'Pay with FonePay',
       'icon': null,
       'logo': 'https://fonepay.com/images/logo.png',
-      'color': Color(0xFF003C7E),
+      'color': const Color(0xFF003C7E),
     },
     {
       'type': 'ConnectIPS',
       'details': 'Pay with ConnectIPS',
       'icon': null,
       'logo': 'https://connectips.com/images/logo.png',
-      'color': Color(0xFF00529B),
+      'color': const Color(0xFF00529B),
     },
     {
       'type': 'IME Pay',
       'details': 'Pay with IME Pay',
       'icon': null,
       'logo': 'https://imepay.com.np/images/logo.png',
-      'color': Color(0xFFE31837),
+      'color': const Color(0xFFE31837),
     },
   ];
 
@@ -143,33 +142,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             }
           }).catchError((error) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Failed to load addresses: $error'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              // Failed to load addresses - handle silently
             }
           });
         } else {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Unable to connect to server. Please check your internet connection.'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            // Unable to connect to server - handle silently
           }
         }
       });
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Authentication required. Please login again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Authentication required - handle silently
       }
     }
   }
@@ -252,16 +236,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               color: const Color(0xFFFC8019).withOpacity(0.1),
               child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.local_grocery_store,
-                    color: const Color(0xFFFC8019),
+                    color: Color(0xFFFC8019),
                     size: 20,
                   ),
                   const SizedBox(width: 8),
-                  Text(
+                  const Text(
                     'T-Mart Order - High Priority',
                     style: TextStyle(
-                      color: const Color(0xFFFC8019),
+                      color: Color(0xFFFC8019),
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
@@ -488,23 +472,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     
     if (addressProvider.addresses.isEmpty) {
       print('❌ Checkout - No addresses available');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please add a delivery address first'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      // Please add a delivery address first - handle silently
       return;
     }
 
     if (_selectedAddressIndex < 0 || _selectedAddressIndex >= addressProvider.addresses.length) {
       print('❌ Checkout - Invalid address selection');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a delivery address'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      // Please select a delivery address - handle silently
       return;
     }
 
@@ -516,12 +490,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // Validate address coordinates
     if (selectedAddress.latitude == 0 && selectedAddress.longitude == 0) {
       print('❌ Checkout - Address missing coordinates');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selected address is missing coordinates. Please select a valid address.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      // Selected address is missing coordinates - handle silently
       return;
     }
 
@@ -636,14 +605,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       print('🛒 Cart cleared after successful order');
       
       // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Order placed successfully! Your cart has been cleared.'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      // Order placed successfully - handle silently
       
       // Call the success callback if provided
       if (widget.onOrderSuccess != null) {
@@ -839,7 +801,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         const SizedBox(height: 16),
         // Add New Address Button
-        Container(
+        SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
             onPressed: () {
@@ -1279,7 +1241,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
                 if (isSelected)
-                  Icon(
+                  const Icon(
                     Icons.check_circle,
                     color: Colors.white,
                     size: 24,

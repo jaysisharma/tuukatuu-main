@@ -62,8 +62,18 @@ class Product {
     return 'Store for $category products';
   }
 
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Product &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
   static List<Product> dummyProducts = [
-    Product(
+    const Product(
       id: '1',
       name: 'Coca Cola 1L',
       price: 80.0,
@@ -80,7 +90,7 @@ class Product {
       ],
       vendorId: 'vendor1',
     ),
-    Product(
+    const Product(
       id: '2',
       name: 'Lays Classic 100g',
       price: 50.0,
@@ -97,7 +107,7 @@ class Product {
       ],
       vendorId: 'vendor2',
     ),
-    Product(
+    const Product(
       id: '3',
       name: 'Amul Milk 1L',
       price: 68.0,
@@ -114,7 +124,7 @@ class Product {
       ],
       vendorId: 'vendor1',
     ),
-    Product(
+    const Product(
       id: '4',
       name: 'Fresh Bread',
       price: 40.0,
@@ -131,7 +141,7 @@ class Product {
       ],
       vendorId: 'vendor2',
     ),
-    Product(
+    const Product(
       id: '5',
       name: 'Chocolate Bar',
       price: 45.0,

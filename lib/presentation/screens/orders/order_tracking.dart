@@ -28,8 +28,8 @@ class _OrderTrackingState extends State<OrderTracking> {
 
     try {
       final deliveryLocation = order['customerLocation'];
-      final startLat = 27.7075;
-      final startLng = 85.3123;
+      const startLat = 27.7075;
+      const startLng = 85.3123;
 
       final endLat = deliveryLocation?['latitude'];
       final endLng = deliveryLocation?['longitude'];
@@ -177,18 +177,18 @@ class _OrderTrackingState extends State<OrderTracking> {
                   ),
                 ],
               ),
-              child: Row(
+              child: const Row(
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 24,
                     backgroundColor: Colors.orange,
                     child: Icon(Icons.timer_outlined, color: Colors.white),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         Text(
                           "Order on the way",
                           style: TextStyle(
@@ -207,7 +207,7 @@ class _OrderTrackingState extends State<OrderTracking> {
                       ],
                     ),
                   ),
-                  const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.black45),
+                  Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.black45),
                 ],
               ),
             ),

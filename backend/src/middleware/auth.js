@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const config = require('../config');
 
 function authenticateToken(req, res, next) {
   console.log('🔍 Auth Middleware: Checking authentication for path:', req.path);
@@ -11,7 +12,7 @@ function authenticateToken(req, res, next) {
   }
 
   console.log('🔍 Auth Middleware: Token found, verifying...');
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  jwt.verify(token, config.jwtSecret, (err, user) => {
     if (err) {
       console.log('❌ Auth Middleware: Invalid token:', err.message);
       return res.status(403).json({ message: 'Invalid token' });

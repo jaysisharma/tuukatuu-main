@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../presentation/screens/home/home_screen.dart';
 import '../../presentation/screens/t_mart_clean_screen.dart';
 import '../../presentation/screens/favorites_screen.dart';
 import '../../presentation/screens/orders/orders_screen.dart';
@@ -7,7 +6,6 @@ import '../../presentation/screens/orders/order_tracking.dart';
 import '../../presentation/screens/store_details_screen.dart';
 import '../../presentation/screens/product_details_screen.dart';
 import '../../presentation/screens/cart/cart_screen.dart';
-import '../../presentation/screens/checkout_screen.dart';
 import '../../presentation/screens/multi_store_cart_screen.dart';
 import 'package:tuukatuu/presentation/screens/mart_cart_screen.dart';
 import '../../presentation/screens/tmart_cart_screen.dart';
@@ -30,10 +28,10 @@ class AppRoutes {
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
-      case home:
-        return MaterialPageRoute(builder: (_) => const HomeScreen());
+      // case home:
+      //   return MaterialPageRoute(builder: (_) => const HomeScreen());
       case tMart:
-        return MaterialPageRoute(builder: (_) =>  TMartCleanScreen());
+        return MaterialPageRoute(builder: (_) =>  const TMartCleanScreen());
       case favorites:
         return MaterialPageRoute(builder: (_) => const FavoritesScreen());
       case orders:
@@ -41,7 +39,6 @@ class AppRoutes {
       case orderTracking:
         if (settings.arguments != null) {
           final args = settings.arguments as Map<String, dynamic>;
-          final orderId = args['orderId'] as String;
           final initialOrder = args['initialOrder'] as Map<String, dynamic>?;
           return MaterialPageRoute(
             // builder: (_) => OrderTrackingScreen(
@@ -59,11 +56,10 @@ class AppRoutes {
       // case location:
         // return MaterialPageRoute(builder: (_) => const LocationScreen());
       case cart:
-        return MaterialPageRoute(builder: (_) => const MultiStoreCartScreen());
+        return MaterialPageRoute(builder: (_) => const CartScreen());
       case multiStoreCart:
         return MaterialPageRoute(builder: (_) => const MultiStoreCartScreen());
-      case '/multi-store-cart':
-        return MaterialPageRoute(builder: (_) => const MultiStoreCartScreen());
+
       // case checkout:
       //   final args = settings.arguments as Map<String, dynamic>;
       //   return MaterialPageRoute(

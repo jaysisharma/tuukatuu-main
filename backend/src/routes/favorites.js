@@ -21,4 +21,7 @@ router.get('/count', auth, favoritesController.getFavoritesCount);
 // Clear all favorites
 router.delete('/', auth, favoritesController.clearAllFavorites);
 
+// Test endpoint to check user schema
+router.get('/test-schema', auth, favoritesController.testUserSchema);
+
 module.exports = router; 

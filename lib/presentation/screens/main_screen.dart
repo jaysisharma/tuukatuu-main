@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:tuukatuu/presentation/screens/home/home_screen3.dart';
+import 'package:tuukatuu/presentation/screens/mart/mart.dart';
 import 'package:tuukatuu/presentation/screens/orders/order_history_screen.dart';
-import '../../providers/order_provider.dart';
+import 'package:tuukatuu/presentation/screens/t_mart_clean_screen.dart';
 import '../../services/order_polling_service.dart';
 import '../../utils/double_back_exit.dart';
-import 'home/home_screen.dart';
-import 't_mart_clean_screen.dart';
+
 import 'profile/profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -20,10 +21,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
   
   final List<Widget> _screens = [
-    const HomeScreen(),
+    // const HomeScreen(),
+    const HomeScreen3(),
+    const Tmart(),
+    // const HomeScreen3(),
     const TMartCleanScreen(),
+    // const TmartScreen(),
     const OrderHistoryScreen(),
-    const ProfileScreen(),
+    // const TMartCleanScreen2(),
+    // const HomeScreen(),
+    // const ProfileScreen(),
   ];
 
   @override
@@ -87,20 +94,20 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           },
           selectedItemColor: const Color(0xFFFC8019),
           unselectedItemColor: Colors.grey,
-          items: [
-            const BottomNavigationBarItem(
+          items: const [
+            BottomNavigationBarItem(
               icon: Icon(Icons.home),
               label: 'Home',
             ),
-            const BottomNavigationBarItem(
+            BottomNavigationBarItem(
               icon: Icon(Icons.store),
               label: 'T-Mart',
             ),
-            const BottomNavigationBarItem(
+            BottomNavigationBarItem(
               icon: Icon(Icons.receipt_long),
               label: 'Orders',
             ),
-            const BottomNavigationBarItem(
+            BottomNavigationBarItem(
               icon: Icon(Icons.person),
               label: 'Profile',
             ),

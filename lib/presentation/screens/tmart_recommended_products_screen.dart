@@ -190,7 +190,7 @@ class _TMartRecommendedProductsScreenState extends State<TMartRecommendedProduct
                 const Spacer(),
                 TextButton(
                   onPressed: _refreshProducts,
-                  child: Text(
+                  child: const Text(
                     'Refresh',
                     style: TextStyle(
                       color: swiggyOrange,
@@ -336,13 +336,7 @@ class _TMartRecommendedProductsScreenState extends State<TMartRecommendedProduct
             quantity: quantity,
             onAdd: () {
               cartProvider.addItem(product);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${product['name']} added to cart'),
-                  backgroundColor: swiggyOrange,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              // Item added to cart silently
             },
             onIncrement: () => cartProvider.updateQuantity(product['_id'] ?? product['id'], quantity + 1),
             onDecrement: () => cartProvider.updateQuantity(product['_id'] ?? product['id'], quantity - 1),

@@ -99,7 +99,7 @@ const TodayDeals = () => {
       const response = await api.get(`/today-deals?${params}`);
       console.log('🔍 Loaded deals:', response);
       
-      const dealsData = response.data || response || [];
+      const dealsData = response.data?.data || response.data || response || [];
       setDeals(Array.isArray(dealsData) ? dealsData : []);
     } catch (error) {
       toast.error('Failed to load today\'s deals');
@@ -113,7 +113,7 @@ const TodayDeals = () => {
   const loadStats = async () => {
     try {
       const response = await api.get('/today-deals/stats');
-      setStats(response.data || response || {});
+      setStats(response.data?.data || response.data || response || {});
     } catch (error) {
       console.error('Error loading stats:', error);
       setStats({
@@ -150,7 +150,7 @@ const TodayDeals = () => {
         endDate: new Date(createFormData.endDate).toISOString()
       };
 
-      await api.post('/deals', dealData);
+      await api.post('/today-deals/deals', dealData);
       toast.success('Deal created successfully!');
       setShowCreateModal(false);
       resetCreateForm();
@@ -176,7 +176,7 @@ const TodayDeals = () => {
         endDate: new Date(editFormData.endDate).toISOString()
       };
 
-      await api.put(`/deals/${editingDeal._id}`, updateData);
+      await api.put(`/today-deals/deals/${editingDeal._id}`, updateData);
       toast.success('Deal updated successfully!');
       setShowEditModal(false);
       setEditingDeal(null);
@@ -192,7 +192,7 @@ const TodayDeals = () => {
     if (!window.confirm('Are you sure you want to delete this deal?')) return;
     
     try {
-      await api.del(`/deals/${dealId}`);
+      await api.del(`/today-deals/deals/${dealId}`);
       toast.success('Deal deleted successfully!');
       loadDeals();
     } catch (error) {
@@ -204,7 +204,7 @@ const TodayDeals = () => {
   // UPDATE - Toggle featured status
   const handleToggleFeatured = async (dealId, currentFeatured) => {
     try {
-      await api.patch(`/deals/${dealId}`, { featured: !currentFeatured });
+      await api.patch(`/today-deals/deals/${dealId}`, { featured: !currentFeatured });
       toast.success(`Deal ${currentFeatured ? 'unfeatured' : 'featured'} successfully!`);
       loadDeals();
     } catch (error) {
@@ -220,11 +220,11 @@ const TodayDeals = () => {
       const formData = new FormData();
       formData.append('image', file);
       
-      const response = await api.upload('/upload-image', formData);
+      const response = await api.upload('/today-deals/upload-image', formData);
       
       setCreateFormData(prev => ({
         ...prev,
-        imageUrl: response.data.imageUrl
+        imageUrl: response.data?.imageUrl || response.imageUrl
       }));
       
       toast.success('Image uploaded successfully');

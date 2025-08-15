@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tuukatuu/presentation/widgets/home_widgets.dart';
 import 'dart:convert';
 import 'package:tuukatuu/routes.dart';
 import 'package:tuukatuu/presentation/screens/location/location_screen.dart';
 import 'package:tuukatuu/services/notification_service.dart';
-import 'package:provider/provider.dart';
-import 'package:tuukatuu/providers/cart_provider.dart';
-import 'package:tuukatuu/providers/mart_cart_provider.dart';
+import 'cart_icon_with_badge.dart';
 
 class AppbarLocation extends StatefulWidget {
-  const AppbarLocation({super.key});
+  final bool showTmartDelivery;
+  
+  const AppbarLocation({
+    super.key,
+    this.showTmartDelivery = false,
+  });
 
   @override
   State<AppbarLocation> createState() => _AppbarLocationState();
@@ -32,14 +36,15 @@ class _AppbarLocationState extends State<AppbarLocation> {
   Future<void> _loadLocationFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final savedLocationData = prefs.getString(_kSavedLocationKey);
-    
+
     if (savedLocationData != null && savedLocationData.isNotEmpty) {
       try {
         // Try to parse as JSON first (new format with label and address)
-        final Map<String, dynamic> locationData = json.decode(savedLocationData);
+        final Map<String, dynamic> locationData =
+            json.decode(savedLocationData);
         final String label = locationData['label'] ?? '';
         final String address = locationData['address'] ?? '';
-        
+
         if (mounted) {
           setState(() {
             _currentLabel = label;
@@ -90,7 +95,7 @@ class _AppbarLocationState extends State<AppbarLocation> {
         // New format - map with label and address
         final String label = result['label'] ?? '';
         final String address = result['address'] ?? '';
-        
+
         if (address.isNotEmpty) {
           if (mounted) {
             setState(() {
@@ -109,7 +114,7 @@ class _AppbarLocationState extends State<AppbarLocation> {
       print('Warning: Attempting to save empty address');
       return;
     }
-    
+
     final prefs = await SharedPreferences.getInstance();
     final locationData = {
       'label': label,
@@ -139,19 +144,19 @@ class _AppbarLocationState extends State<AppbarLocation> {
         case "gym":
           return Icons.fitness_center;
         case "school":
-          return Icons.school;
+          return Icons.school_outlined;
         case "university":
-          return Icons.school;
+          return Icons.school_outlined;
         case "college":
-          return Icons.school;
+          return Icons.school_outlined;
         case "hospital":
-          return Icons.local_hospital;
+          return Icons.local_hospital_outlined;
         case "clinic":
-          return Icons.local_hospital;
+          return Icons.local_hospital_outlined;
         case "current location":
-          return Icons.my_location;
+          return Icons.location_on_outlined;
         default:
-          return Icons.location_on;
+          return Icons.location_on_outlined;
       }
     }
     return Icons.location_on;
@@ -180,86 +185,103 @@ class _AppbarLocationState extends State<AppbarLocation> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    String locationForDisplay = _getTruncatedLocation(_getDisplayText());
+Widget build(BuildContext context) {
+  String locationForDisplay = _getTruncatedLocation(_getDisplayText());
 
-    return AppBar(
-      centerTitle: true,
-      automaticallyImplyLeading: false,
-      backgroundColor: Colors.transparent,
-      foregroundColor: Colors.white,
-      elevation: 1,
-      titleSpacing: 0,
-      title: Row(
-        children: [
-          const SizedBox(width: 16.0),
-          InkWell(
-            onTap: _navigateToLocationScreen,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      _getIconForLocation(),
-                      size: 24,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 4.0),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Deliver to",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white,
+  return Container(
+    height: widget.showTmartDelivery ? 70 : 50, // Increase height when showing Tmart delivery
+    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+    
+    child: Column(
+      children: [
+        // Tmart Quick Delivery Indicator
+       
+        // Main Location Row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            InkWell(
+              onTap: _navigateToLocationScreen,
+              child: Row(
+                children: [
+                  Icon(
+                    _getIconForLocation(),
+                    size: 24,
+                    color: Colors.orange,
+                  ),
+                  const SizedBox(width: 6.0),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "Deliver to",
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          Text(
+                            locationForDisplay,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        Row(
-                          children: [
-                            Text(
-                              locationForDisplay,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                            const Icon(
-                              Icons.keyboard_arrow_down,
-                              size: 18,
-                              color: Colors.white,
-                            ),
-                          ],
-                        ),
-                      ],
+                          const Icon(
+                            Icons.keyboard_arrow_down,
+                            size: 18,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+           
+            if (widget.showTmartDelivery) ...[
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      "T-Mart",
+                      style: TextStyle(
+                        fontSize: 16, 
+                        fontWeight: FontWeight.w700, 
+                        color: Colors.grey[600]
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    Text(
+                      "Quick Delivery under 30 mins", 
+                      style: TextStyle(
+                        fontSize: 12, 
+                        fontWeight: FontWeight.w500, 
+                        color: Colors.grey[600]
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const Spacer(),
-          // Notification icon
-          GestureDetector(
-            onTap: () async {
-              await Navigator.pushNamed(context, AppRoutes.notifications);
-              _loadNotificationCount();
-            },
-            child: Container(
-              padding: const EdgeInsets.all(8),
+              ),
+            ],
+         Row(
+          children: [
+               GestureDetector(
+              onTap: () async {
+                await Navigator.pushNamed(context, AppRoutes.notifications);
+                _loadNotificationCount();
+              },
               child: Stack(
                 children: [
-                  const Icon(
-                    Icons.notifications_outlined,
-                    size: 28,
-                    color: Colors.white,
-                  ),
-                  // Notification badge
+                  const IconButtonWidget(Icons.notifications_outlined),
                   if (_notificationCount > 0)
                     Positioned(
                       right: 0,
@@ -267,7 +289,7 @@ class _AppbarLocationState extends State<AppbarLocation> {
                       child: Container(
                         padding: const EdgeInsets.all(2),
                         decoration: BoxDecoration(
-                          color: Colors.red,
+                          color: Colors.orange,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         constraints: const BoxConstraints(
@@ -277,7 +299,6 @@ class _AppbarLocationState extends State<AppbarLocation> {
                         child: Text(
                           _notificationCount.toString(),
                           style: const TextStyle(
-                            color: Colors.white,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
@@ -288,61 +309,23 @@ class _AppbarLocationState extends State<AppbarLocation> {
                 ],
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          // Cart icon
-          GestureDetector(
-            onTap: () {
-              Navigator.pushNamed(context, AppRoutes.cart);
-            },
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              child: Stack(
-                children: [
-                  const Icon(
-                    Icons.shopping_cart_outlined,
-                    size: 28,
-                    color: Colors.white,
-                  ),
-                  // Cart badge
-                  Consumer2<CartProvider, MartCartProvider>(
-                    builder: (context, cartProvider, martCartProvider, child) {
-                      final cartCount = cartProvider.itemCount + martCartProvider.itemCount;
-                      if (cartCount == 0) return const SizedBox.shrink();
-                      
-                      return Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: Colors.orange,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 16,
-                            minHeight: 16,
-                          ),
-                          child: Text(
-                            cartCount.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.all(6),
+              child: const CartIconWithBadge(
+                iconSize: 20,
+                badgeColor: Colors.orange,
+                badgeSize: 18,
+                iconColor: Colors.black87,
+                badgeOffset: EdgeInsets.only(top: -10, right: -10),
               ),
             ),
-          ),
-          const SizedBox(width: 16.0),
-        ],
-      ),
-    );
-  }
+         
+          ],
+         ) ],
+        ),
+      ],
+    ),
+  );
+}
 }

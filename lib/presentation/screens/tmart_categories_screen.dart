@@ -18,8 +18,6 @@ class _TMartCategoriesScreenState extends State<TMartCategoriesScreen> {
 
   // Swiggy color scheme
   static const Color swiggyOrange = Color(0xFFFC8019);
-  static const Color swiggyRed = Color(0xFFE23744);
-  static const Color swiggyDark = Color(0xFF1C1C1C);
   static const Color swiggyLight = Color(0xFFF8F9FA);
 
   @override

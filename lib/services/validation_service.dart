@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+
+import '../utils/country_codes.dart';
 
 class ValidationService {
   // Email validation
@@ -7,10 +8,75 @@ class ValidationService {
     return emailRegex.hasMatch(email);
   }
 
-  // Phone validation (Nepal format)
-  static bool isValidPhone(String phone) {
-    final phoneRegex = RegExp(r'^(\+977|977)?[9][6-8]\d{8}$');
-    return phoneRegex.hasMatch(phone);
+  // Phone validation (International format)
+  static bool isValidPhone(String phone, {String? countryCode}) {
+    // Remove all non-digit characters except +
+    final cleanedPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    
+    // If country code is provided, validate accordingly
+    if (countryCode != null) {
+      switch (countryCode) {
+        case 'NP': // Nepal
+          return RegExp(r'^(\+977|977)?[9][6-8]\d{8}$').hasMatch(cleanedPhone);
+        case 'IN': // India
+          return RegExp(r'^(\+91|91)?[6-9]\d{9}$').hasMatch(cleanedPhone);
+        case 'US': // United States
+        case 'CA': // Canada
+          return RegExp(r'^(\+1|1)?[2-9]\d{9}$').hasMatch(cleanedPhone);
+        case 'GB': // United Kingdom
+          return RegExp(r'^(\+44|44)?[1-9]\d{9}$').hasMatch(cleanedPhone);
+        case 'AU': // Australia
+          return RegExp(r'^(\+61|61)?[2-9]\d{8}$').hasMatch(cleanedPhone);
+        case 'DE': // Germany
+          return RegExp(r'^(\+49|49)?[1-9]\d{10,11}$').hasMatch(cleanedPhone);
+        case 'FR': // France
+          return RegExp(r'^(\+33|33)?[1-9]\d{8}$').hasMatch(cleanedPhone);
+        case 'JP': // Japan
+          return RegExp(r'^(\+81|81)?[1-9]\d{9}$').hasMatch(cleanedPhone);
+        case 'CN': // China
+          return RegExp(r'^(\+86|86)?[1-9]\d{10}$').hasMatch(cleanedPhone);
+        case 'KR': // South Korea
+          return RegExp(r'^(\+82|82)?[1-9]\d{9}$').hasMatch(cleanedPhone);
+        case 'SG': // Singapore
+          return RegExp(r'^(\+65|65)?[6-9]\d{7}$').hasMatch(cleanedPhone);
+        case 'MY': // Malaysia
+          return RegExp(r'^(\+60|60)?[1-9]\d{8,9}$').hasMatch(cleanedPhone);
+        case 'TH': // Thailand
+          return RegExp(r'^(\+66|66)?[1-9]\d{8}$').hasMatch(cleanedPhone);
+        case 'VN': // Vietnam
+          return RegExp(r'^(\+84|84)?[1-9]\d{8,9}$').hasMatch(cleanedPhone);
+        case 'PH': // Philippines
+          return RegExp(r'^(\+63|63)?[2-9]\d{9}$').hasMatch(cleanedPhone);
+        case 'ID': // Indonesia
+          return RegExp(r'^(\+62|62)?[2-9]\d{8,9}$').hasMatch(cleanedPhone);
+        case 'BD': // Bangladesh
+          return RegExp(r'^(\+880|880)?[1-9]\d{9}$').hasMatch(cleanedPhone);
+        case 'PK': // Pakistan
+          return RegExp(r'^(\+92|92)?[1-9]\d{9}$').hasMatch(cleanedPhone);
+        case 'LK': // Sri Lanka
+          return RegExp(r'^(\+94|94)?[1-9]\d{8}$').hasMatch(cleanedPhone);
+        case 'MV': // Maldives
+          return RegExp(r'^(\+960|960)?[1-9]\d{6}$').hasMatch(cleanedPhone);
+        case 'BT': // Bhutan
+          return RegExp(r'^(\+975|975)?[1-9]\d{7}$').hasMatch(cleanedPhone);
+        case 'MM': // Myanmar
+          return RegExp(r'^(\+95|95)?[1-9]\d{9}$').hasMatch(cleanedPhone);
+        case 'LA': // Laos
+          return RegExp(r'^(\+856|856)?[1-9]\d{8}$').hasMatch(cleanedPhone);
+        case 'KH': // Cambodia
+          return RegExp(r'^(\+855|855)?[1-9]\d{8}$').hasMatch(cleanedPhone);
+        case 'BN': // Brunei
+          return RegExp(r'^(\+673|673)?[1-9]\d{6}$').hasMatch(cleanedPhone);
+        case 'TL': // East Timor
+          return RegExp(r'^(\+670|670)?[1-9]\d{7}$').hasMatch(cleanedPhone);
+        default:
+          // Generic validation for other countries (7-15 digits)
+          return RegExp(r'^\+?[1-9]\d{6,14}$').hasMatch(cleanedPhone);
+      }
+    }
+    
+    // Default to Nepal validation if no country code provided
+    return RegExp(r'^(\+977|977)?[9][6-8]\d{8}$').hasMatch(cleanedPhone);
   }
 
   // Password validation (minimum 8 characters, at least one letter and one number)
@@ -87,9 +153,19 @@ class ValidationService {
     return '';
   }
 
-  static String getPhoneErrorMessage(String phone) {
+  static String getPhoneErrorMessage(String phone, {String? countryCode}) {
     if (phone.isEmpty) return 'Phone number is required';
-    if (!isValidPhone(phone)) return 'Please enter a valid phone number';
+    if (!isValidPhone(phone, countryCode: countryCode)) {
+      if (countryCode == 'NP') {
+        return 'Please enter a valid Nepal phone number (e.g., +977 98XXXXXXXX)';
+      } else if (countryCode != null) {
+        final country = CountryCodes.findByCode(countryCode);
+        if (country != null) {
+          return 'Please enter a valid ${country.name} phone number';
+        }
+      }
+      return 'Please enter a valid phone number';
+    }
     return '';
   }
 

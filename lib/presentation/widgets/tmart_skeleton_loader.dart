@@ -110,7 +110,7 @@ class TMartCategoryCardSkeleton extends StatelessWidget {
     return Shimmer.fromColors(
       baseColor: Colors.grey[300]!,
       highlightColor: Colors.grey[100]!,
-      child: Container(
+      child: SizedBox(
         width: 80,
         child: Column(
           children: [

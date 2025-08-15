@@ -10,7 +10,10 @@
     "seed:riders": "node seed_riders.js",
     "seed:vendors": "node seed_vendors.js",
     "seed:vendors-only": "node seed_vendors_only.js",
-    "seed:all": "node seed_all.js"
+    "seed:all": "node seed_all.js",
+    "seed:enhanced-kathmandu": "node seed/seed_enhanced_kathmandu.js",
+    "seed:categories": "node seed/create_categories_from_products.js",
+    "seed:tmart-banners": "node seed/seed_tmart_banners.js"
   },
   "dependencies": {
     "axios": "^1.11.0",

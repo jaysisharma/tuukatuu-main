@@ -3,9 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:tuukatuu/providers/cart_provider.dart';
 import 'package:tuukatuu/providers/mart_cart_provider.dart';
 import 'package:tuukatuu/widgets/cached_image.dart';
-import 'package:tuukatuu/core/config/routes.dart';
 import 'package:tuukatuu/presentation/screens/checkout_screen.dart';
-import 'package:tuukatuu/presentation/screens/store_details_screen.dart';
 
 class UnifiedCartScreen extends StatefulWidget {
   const UnifiedCartScreen({super.key});
@@ -317,7 +315,6 @@ class _UnifiedCartScreenState extends State<UnifiedCartScreen> {
     final cartProvider = Provider.of<CartProvider>(context);
     final martCartProvider = Provider.of<MartCartProvider>(context);
     final storeType = storeCart['storeType'] ?? 'store';
-    final storeId = storeCart['storeId'] ?? '';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -520,28 +517,6 @@ class _UnifiedCartScreenState extends State<UnifiedCartScreen> {
     return storeCarts;
   }
 
-  void _navigateToStore(Map<String, dynamic> storeCart) {
-    final storeType = storeCart['storeType'];
-    final storeId = storeCart['storeId'];
-
-    if (storeType == 'tmart') {
-      Navigator.pushNamed(context, AppRoutes.tMart);
-    } else {
-      // Navigate to store details
-      final storeData = {
-        '_id': storeId,
-        'storeName': storeCart['storeName'],
-        'storeImage': storeCart['storeImage'],
-        'vendorType': storeType,
-      };
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => StoreDetailsScreen(store: storeData),
-        ),
-      );
-    }
-  }
 
   void _showStoreDetails(Map<String, dynamic> storeCart) {
     final storeName = storeCart['storeName'] ?? 'Unknown Store';
@@ -552,7 +527,7 @@ class _UnifiedCartScreenState extends State<UnifiedCartScreen> {
     final subtotal = items.fold(0.0, (sum, item) => 
       sum + ((item['price'] ?? 0) * (item['quantity'] ?? 0)));
     
-    final deliveryFee = 20.0;
+    const deliveryFee = 20.0;
     final finalTotal = subtotal + deliveryFee;
 
     showModalBottomSheet(
@@ -761,10 +736,8 @@ class _UnifiedCartScreenState extends State<UnifiedCartScreen> {
     final totalAmount = items.fold(0.0, (sum, item) => 
       sum + ((item['price'] ?? 0) * (item['quantity'] ?? 0)));
     
-    final deliveryFee = 20.0; // ₹20 delivery fee per store
+    const deliveryFee = 20.0; // ₹20 delivery fee per store
     final finalTotal = totalAmount + deliveryFee;
-
-    print('🛒 Checking out from $storeName - Items: $totalItems, Total: ₹${finalTotal.toStringAsFixed(2)}');
 
     // Show confirmation dialog
     showDialog(
@@ -772,7 +745,7 @@ class _UnifiedCartScreenState extends State<UnifiedCartScreen> {
       builder: (context) => AlertDialog(
         title: Text('Checkout from $storeName'),
         content: Text(
-          'You\'re about to checkout ${totalItems} items from $storeName for ₹${finalTotal.toStringAsFixed(2)}. '
+          'You\'re about to checkout $totalItems items from $storeName for ₹${finalTotal.toStringAsFixed(2)}. '
           'This will remove these items from your cart.',
         ),
         actions: [

@@ -5,10 +5,10 @@ import '../core/config/app_config.dart';
 class ApiConfig {
   // Development URLs - change these based on your network
   @deprecated
-  static const String localhost = 'http://13.203.210.247:3000/api';
+  static const String localhost = 'http://localhost:3000/api';
   
   @deprecated
-  static const String localIP = 'http://13.203.210.247:3000/api';
+  static const String localIP = 'http://localhost:3000/api';
   
   // Use centralized config instead
   @deprecated

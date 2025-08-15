@@ -607,7 +607,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> with ErrorHandl
                               borderRadius: BorderRadius.circular(4),
                               border: Border.all(color: Colors.orange.withOpacity(0.3)),
                             ),
-                            child: Text(
+                            child: const Text(
                               'T-Mart',
                               style: TextStyle(
                                 color: Colors.orange,
@@ -791,7 +791,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> with ErrorHandl
   }
 
   Widget _buildEmptyWidget() {
-    return EmptyStateWidget(
+    return const EmptyStateWidget(
       title: 'No orders found',
       message: 'Try adjusting your filters or search terms',
       icon: Icons.receipt_long_outlined,

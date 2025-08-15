@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/recently_viewed_provider.dart';
 import '../../providers/mart_cart_provider.dart';
-import '../widgets/tmart_product_card.dart';
 
 class RecentlyViewedPage extends StatefulWidget {
   const RecentlyViewedPage({Key? key}) : super(key: key);
@@ -160,7 +159,7 @@ class _RecentlyViewedPageState extends State<RecentlyViewedPage> {
                           filled: true,
                           fillColor: Colors.white,
                         ),
-                        items: [
+                        items: const [
                           DropdownMenuItem(value: 0.0, child: Text('Any Rating')),
                           DropdownMenuItem(value: 3.0, child: Text('3+ Stars')),
                           DropdownMenuItem(value: 4.0, child: Text('4+ Stars')),

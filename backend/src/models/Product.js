@@ -5,6 +5,7 @@ const productSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   imageUrl: { type: String, required: true },
   category: { type: String, required: true },
+  subcategory: { type: String }, // Add subcategory field
   rating: { type: Number, default: 0 },
   reviews: { type: Number, default: 0 },
   isAvailable: { type: Boolean, default: true },
@@ -46,26 +47,34 @@ productSchema.pre('save', async function(next) {
     if (this.isNew && this.category) {
       const Category = require('./Category');
       
-      // Check if category exists
+      // Check if category exists (case-insensitive)
       const existingCategory = await Category.findOne({
         name: { $regex: new RegExp(`^${this.category}$`, 'i') }
       });
       
       if (!existingCategory) {
-        // Auto-create category
+        // Enhanced auto-create category with better data
         const categoryData = {
           name: this.category,
           displayName: this.category,
-          description: `Auto-generated category for ${this.category}`,
+          description: `Auto-generated category for ${this.category} products`,
+          color: getRandomColor(),
           isActive: true,
           isFeatured: false,
-          createdBy: this.vendorId // Use vendor as creator for now
+          sortOrder: 0,
+          createdBy: this.vendorId || null,
+          // Add metadata based on category type
+          metadata: {
+            seoTitle: `${this.category} Products - Tuukatuu`,
+            seoDescription: `Discover the best ${this.category} products from top vendors in Kathmandu`,
+            keywords: [this.category, 'products', 'Kathmandu', 'delivery']
+          }
         };
         
         const newCategory = new Category(categoryData);
         await newCategory.save();
         
-        console.log(`✅ Auto-created category: ${this.category}`);
+        console.log(`✅ Auto-created enhanced category: ${this.category}`);
       }
     }
     next();
@@ -74,6 +83,12 @@ productSchema.pre('save', async function(next) {
     next(error);
   }
 });
+
+// Helper function to get random color for categories
+function getRandomColor() {
+  const colors = ['green', 'blue', 'orange', 'red', 'purple', 'cyan', 'indigo', 'pink', 'teal', 'amber', 'deepPurple', 'lightBlue', 'yellow', 'brown'];
+  return colors[Math.floor(Math.random() * colors.length)];
+}
 
 // Add a static method for seeding products
 productSchema.statics.seedProducts = async function() {

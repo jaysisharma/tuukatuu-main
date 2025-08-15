@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { shuffleVendors } = require('../utils/shuffleUtils');
+const config = require('../config');
 
 exports.registerUser = async ({ name, email, phone, password, role }) => {
   if (typeof phone !== 'string') {
@@ -17,7 +19,7 @@ exports.loginUser = async ({ email, password }) => {
   if (!user) throw new Error('Invalid credentials');
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) throw new Error('Invalid credentials');
-  const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  const token = jwt.sign({ id: user._id, role: user.role }, config.jwtSecret, { expiresIn: '7d' });
   return { token, user: { id: user._id, name: user.name, email: user.email, role: user.role } };
 };
 
@@ -38,10 +40,32 @@ exports.changePassword = async (id, oldPassword, newPassword) => {
   return user;
 };
 
-exports.getVendors = async () => {
-  return await User.find({ role: 'vendor' }).select('-password');
+exports.getVendors = async (options = {}) => {
+  const { shuffle = true } = options;
+  let vendors = await User.find({ role: 'vendor' }).select('-password');
+  
+  if (shuffle) {
+    vendors = shuffleVendors(vendors, {
+      prioritizeFeatured: true,
+      maintainQualityOrder: true,
+      considerRating: true
+    });
+  }
+  
+  return vendors;
 };
 
-exports.getFeaturedVendors = async () => {
-  return await User.find({ role: 'vendor', isFeatured: true }).select('-password');
+exports.getFeaturedVendors = async (options = {}) => {
+  const { shuffle = true } = options;
+  let vendors = await User.find({ role: 'vendor', isFeatured: true }).select('-password');
+  
+  if (shuffle) {
+    vendors = shuffleVendors(vendors, {
+      prioritizeFeatured: true,
+      maintainQualityOrder: true,
+      considerRating: true
+    });
+  }
+  
+  return vendors;
 }; 

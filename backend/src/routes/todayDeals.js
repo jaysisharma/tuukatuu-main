@@ -5,15 +5,16 @@ const { authenticateToken } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
 // Public routes
-router.get('/today-deals', todayDealsController.getTodayDeals);
-router.get('/today-deals/stats', todayDealsController.getTodayDealsStats);
-router.get('/featured-deals', todayDealsController.getFeaturedDeals);
-router.get('/deals/category/:category', todayDealsController.getDealsByCategory);
-router.get('/deals/:dealId', todayDealsController.getDealById);
+router.get('/', todayDealsController.getTodayDeals);
+router.get('/stats', todayDealsController.getTodayDealsStats);
+router.get('/featured', todayDealsController.getFeaturedDeals);
+router.get('/category/:category', todayDealsController.getDealsByCategory);
+router.get('/:dealId', todayDealsController.getDealById);
 
 // Admin routes (protected)
 router.post('/deals', authenticateToken, todayDealsController.createDeal);
 router.put('/deals/:dealId', authenticateToken, todayDealsController.updateDeal);
+router.patch('/deals/:dealId', authenticateToken, todayDealsController.updateDeal);
 router.delete('/deals/:dealId', authenticateToken, todayDealsController.deleteDeal);
 
 // Image upload route

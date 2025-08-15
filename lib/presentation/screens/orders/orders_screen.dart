@@ -1,6 +1,6 @@
-import 'dart:convert';
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:tuukatuu/core/config/routes.dart';
 import 'package:tuukatuu/providers/auth_provider.dart';
@@ -93,16 +93,6 @@ class OrdersScreenState extends State<OrdersScreen> with RouteAware {
     }
   }
 
-  void _orderAgain(Map<String, dynamic> order) {
-    // Add all items from the order to cart
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Items added to cart'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    Navigator.pushNamed(context, AppRoutes.cart);
-  }
 
   Widget _buildOrderCard(Map<String, dynamic> order) {
     final theme = Theme.of(context);
@@ -130,7 +120,7 @@ class OrdersScreenState extends State<OrdersScreen> with RouteAware {
     String getItemsText() {
       final List<String> names = displayedItems.map((item) => getItemName(item)).toList();
       if (remainingItems > 0) {
-        return names.join(", ") + ' + $remainingItems more';
+        return '${names.join(", ")} + $remainingItems more';
       }
       return names.join(", ");
     }
@@ -517,7 +507,7 @@ class OrderDetailScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Order Details'),
-        leading: BackButton(),
+        leading: const BackButton(),
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
       ),

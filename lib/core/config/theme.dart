@@ -109,7 +109,6 @@ class AppTheme {
         primary: Colors.orange[700]!,
         secondary: Colors.orange[500]!,
         surface: Colors.white,
-        background: Colors.grey[50]!,
         error: Colors.red[700]!,
       ),
     );
@@ -226,24 +225,22 @@ class AppTheme {
         primary: Colors.orange[300]!,
         secondary: Colors.orange[500]!,
         surface: surfaceColor,
-        background: backgroundColor,
         error: Colors.red[300]!,
         onSurface: Colors.grey[100]!,
-        onBackground: Colors.grey[100]!,
         onPrimary: Colors.grey[100]!,
       ),
       iconTheme: IconThemeData(
         color: Colors.grey[100],
       ),
       switchTheme: SwitchThemeData(
-        thumbColor: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
             return Colors.orange[300];
           }
           return Colors.grey[400];
         }),
-        trackColor: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
             return Colors.orange[900];
           }
           return Colors.grey[800];
